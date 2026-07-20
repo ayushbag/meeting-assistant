@@ -1,159 +1,273 @@
-# Turborepo starter
+# MeetingLens
 
-This Turborepo starter is maintained by the Turborepo core team.
+> AI-powered meeting intelligence platform that transforms meeting recordings into searchable knowledge.
 
-## Using this example
+MeetingLens automatically processes meeting recordings, generates structured summaries, extracts action items and decisions, identifies speakers, and provides an AI chatbot to query any meeting.
 
-Run the following command:
+The project is being built as a **production-grade AI SaaS**, focusing on scalable architecture, clean code, background processing, and provider abstraction rather than a simple demo application.
 
-```sh
-npx create-turbo@latest
+---
+
+# Vision
+
+Meetings contain valuable information that is usually forgotten after they end.
+
+MeetingLens converts every meeting into an intelligent knowledge base by:
+
+- Recording meetings
+- Processing audio
+- Generating transcripts
+- Mapping speakers
+- Extracting action items
+- Extracting decisions
+- Generating summaries
+- Allowing users to chat with previous meetings
+
+---
+
+# Features
+
+## Core Features
+
+- User Authentication
+- Meeting Management
+- Meeting Recording
+- Background Processing
+- AI Generated Summaries
+- Action Items
+- Decision Extraction
+- Speaker Mapping
+- AI Chat
+- Semantic Search
+- Meeting Timeline
+- Upload Progress
+- Retry Failed Jobs
+
+---
+
+## AI Features
+
+- Speech-to-Text
+- Speaker Diarization
+- Meeting Summaries
+- Action Item Extraction
+- Decision Detection
+- Retrieval Augmented Generation (RAG)
+- Contextual AI Chat
+- Embedding Search
+
+---
+
+## Future Features
+
+- Google Calendar Integration
+- Outlook Integration
+- Zoom Integration
+- Google Meet Integration
+- Slack Notifications
+- Email Reports
+- Team Workspaces
+- Analytics Dashboard
+- Meeting Insights
+- Mobile Application
+
+---
+
+# Tech Stack
+
+## Frontend
+
+- React
+- TypeScript
+- Vite
+- TailwindCSS
+- TanStack Query
+- React Router
+
+---
+
+## Backend
+
+- Node.js
+- Express
+- TypeScript
+- Prisma ORM
+- PostgreSQL
+- BullMQ
+- Redis
+
+---
+
+## AI
+
+- Google Gemini
+- OpenRouter
+- Faster Whisper
+- Pyannote
+- pgvector
+
+Provider architecture allows changing models without changing business logic.
+
+---
+
+## Infrastructure
+
+- Turborepo
+- Docker
+- Docker Compose
+- GitHub Actions
+- S3 Compatible Storage
+
+---
+
+# High Level Architecture
+
+```text
+Chrome Extension
+        │
+        ▼
+   Express API
+        │
+        ▼
+     BullMQ Queue
+        │
+        ▼
+   Background Workers
+        │
+        ▼
+AI Providers + Storage
+        │
+        ▼
+ PostgreSQL + Object Storage
 ```
 
-## What's inside?
+---
 
-This Turborepo includes the following packages/apps:
+# Project Structure
 
-### Apps and Packages
+```
+meetinglens/
 
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
+apps/
+    api/
+    web/
+    workers/
+    extension/
 
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
+packages/
+    ai-sdk/
+    config/
+    db/
+    logger/
+    queue/
+    storage/
+    types/
+    utils/
 
-### Utilities
+docker/
 
-This Turborepo has some additional tools already setup for you:
+docs/
 
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
-
-### Build
-
-To build all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo build
+scripts/
 ```
 
-Without global `turbo`, use your package manager:
+---
 
-```sh
-cd my-turborepo
-npx turbo build
-pnpm dlx turbo build
-pnpm exec turbo build
-```
+# Design Principles
 
-You can build a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+MeetingLens follows several engineering principles.
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
+- Domain-first architecture
+- Thin controllers
+- Service layer
+- Repository pattern
+- Provider pattern
+- Factory pattern
+- Event-driven processing
+- Background workers
+- Dependency inversion
+- Separation of concerns
 
-```sh
-turbo build --filter=docs
-```
+---
 
-Without global `turbo`:
+# Development Philosophy
 
-```sh
-npx turbo build --filter=docs
-pnpm exec turbo build --filter=docs
-pnpm exec turbo build --filter=docs
-```
+The goal is **not** to build a tutorial project.
 
-### Develop
+The goal is to build software similar to what a startup would deploy in production.
 
-To develop all apps and packages, run the following command:
+The architecture prioritizes:
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
+- Maintainability
+- Scalability
+- Testability
+- Clear ownership
+- Replaceable providers
+- Clean boundaries
 
-```sh
-cd my-turborepo
-turbo dev
-```
+---
 
-Without global `turbo`, use your package manager:
+# Architecture Highlights
 
-```sh
-cd my-turborepo
-npx turbo dev
-pnpm exec turbo dev
-pnpm exec turbo dev
-```
+- Monorepo using Turborepo
+- One Docker Compose for local development
+- Independent Dockerfile for every application
+- Shared infrastructure packages
+- Business logic separated into modules
+- Background workers using BullMQ
+- AI providers abstracted behind interfaces
 
-You can develop a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+---
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
+# Current Development Status
 
-```sh
-turbo dev --filter=web
-```
+The project is currently under active development.
 
-Without global `turbo`:
+Development follows milestone-based architecture rather than feature-based implementation.
 
-```sh
-npx turbo dev --filter=web
-pnpm exec turbo dev --filter=web
-pnpm exec turbo dev --filter=web
-```
+Each milestone focuses on one responsibility before moving to the next.
 
-### Remote Caching
+---
 
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
+# Planned Milestones
 
-Turborepo can use a technique known as [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
+- Foundation
+- Infrastructure
+- Database
+- Authentication
+- Meeting Management
+- Upload Pipeline
+- Queue System
+- Workers
+- Audio Processing
+- Transcription
+- Speaker Mapping
+- AI Summaries
+- Embeddings
+- Chat
+- Chrome Extension
+- Production Hardening
+- Deployment
 
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
+---
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
+# Why This Project
 
-```sh
-cd my-turborepo
-turbo login
-```
+MeetingLens is being built to demonstrate production-level software engineering concepts including:
 
-Without global `turbo`, use your package manager:
+- Monorepo architecture
+- Dockerized development
+- Queue-based systems
+- Distributed workers
+- AI orchestration
+- Clean architecture
+- Provider abstraction
+- Scalable backend design
 
-```sh
-cd my-turborepo
-npx turbo login
-pnpm exec turbo login
-pnpm exec turbo login
-```
+rather than simply integrating an LLM API.
 
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
+---
 
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
+# License
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo link
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo link
-pnpm exec turbo link
-pnpm exec turbo link
-```
-
-## Useful Links
-
-Learn more about the power of Turborepo:
-
-- [Tasks](https://turborepo.dev/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.dev/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.dev/docs/reference/configuration)
-- [CLI Usage](https://turborepo.dev/docs/reference/command-line-reference)
+MIT
