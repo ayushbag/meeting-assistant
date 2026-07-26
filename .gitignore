@@ -38,3 +38,8 @@ yarn-error.log*
 *.pem
 
 docs
+
+MeetingLens-Auth-API.postman_collection.json
+
+# Learning documentation
+learning/
