@@ -12,15 +12,150 @@ datasource db {
   provider = "postgresql"
 }
 
-model User {
-  id              String   @id @default(cuid())
-  email           String   @unique
-  name            String?
-  password        String?
-  avatar          String?
-  googleId        String?  @unique
-  isEmailVerified   Boolean  @default(false)
+enum MeetingStatus {
+  DRAFT
+  UPLOADING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+enum RecordingStatus {
+  UPLOADING
+  UPLOADED
+  EXTRACTING_AUDIO
+  TRANSCRIBING
+  SUMMARIZING
+  COMPLETED
+  FAILED
+}
+
+enum ChatRole {
+  USER
+  ASSISTANT
+}
+
+model User {
+  id String @id @default(cuid())
+
+  email    String  @unique
+  name     String?
+  password String?
+  avatar   String?
+
+  googleId        String? @unique
+  isEmailVerified Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  meetings Meeting[]
+}
+
+model Meeting {
+  id String @id @default(cuid())
+
+  title       String
+  description String?
+
+  status MeetingStatus @default(DRAFT)
+
+  createdById String
+  createdBy   User   @relation(fields: [createdById], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  recording  Recording?
+  transcript Transcript?
+  summary    Summary?
+
+  participants Participant[]
+  chats        ChatMessage[]
+
+  @@index([createdById])
+  @@index([status])
+  @@map("meetings")
+}
+
+model Recording {
+  id String @id @default(cuid())
+
+  meetingId String  @unique
+  meeting   Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+
+  fileName String
+  fileKey  String @unique
+  fileUrl  String
+
+  mimeType String
+  size     BigInt
+
+  duration Int?
+
+  status RecordingStatus @default(UPLOADED)
+
+  uploadedAt DateTime @default(now())
+
+  @@map("recordings")
+}
+
+model Transcript {
+  id String @id @default(cuid())
+
+  meetingId String  @unique
+  meeting   Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+
+  content String @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("transcripts")
+}
+
+model Summary {
+  id String @id @default(cuid())
+
+  meetingId String  @unique
+  meeting   Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+
+  markdown String @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("summaries")
+}
+
+model Participant {
+  id String @id @default(cuid())
+
+  meetingId String
+  meeting   Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+
+  name String
+
+  speakerId String?
+
+  createdAt DateTime @default(now())
+
+  @@index([meetingId])
+  @@map("participants")
+}
+
+model ChatMessage {
+  id String @id @default(cuid())
+
+  meetingId String
+  meeting   Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+
+  role ChatRole
+
+  message String @db.Text
+
+  createdAt DateTime @default(now())
+
+  @@index([meetingId])
+  @@map("chat_messages")
 }
