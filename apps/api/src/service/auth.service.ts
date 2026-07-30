@@ -3,9 +3,18 @@ import z from 'zod';
 import { registerSchema, loginSchema } from '../validation/auth.validation.js';
 import { hashValue, comparePassword } from '../utils/bcrpyt.js';
 import { prisma } from '@repo/db';
-import { BadRequestException, UnauthorizedException } from '../utils/app-error.js';
+import {
+    BadRequestException,
+    InternalServerError,
+    UnauthorizedException,
+} from '../utils/app-error.js';
 import { ErrorCodeEnum } from '../enums/error-code.enum.js';
-import { signAccessToken, signRefreshToken } from '../utils/jwt.js';
+import {
+    setAuthCookies,
+    signAccessToken,
+    signRefreshToken,
+    verifyRefreshToken,
+} from '../utils/jwt.js';
 import { googleClient } from '../utils/google.js';
 import { env } from '../config/app.config.js';
 
@@ -235,6 +244,28 @@ export const googleCallbackService = async (code: string) => {
     });
 
     return {
-        user
+        user,
     };
+};
+
+/**
+ * Verify the refresh token and return the authenticated user payload.
+ */
+export const refreshTokenService = async (token: string) => {
+    const payload = verifyRefreshToken(token);
+
+    const user = await prisma.user.findUnique({
+        where: {
+            id: payload.userId,
+        },
+    });
+
+    if (!user) {
+        throw new UnauthorizedException();
+    }
+
+    return {
+        userId: user.id,
+        email: user.email
+    }
 };

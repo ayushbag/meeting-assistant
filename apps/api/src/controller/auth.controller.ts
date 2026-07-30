@@ -7,6 +7,7 @@ import {
     loginUserService,
     googleCallbackService,
     googleLoginService,
+    refreshTokenService,
 } from '../service/auth.service.js';
 import { setAuthCookies, clearAuthCookies } from '../utils/jwt.js';
 import { BadRequestException } from '../utils/app-error.js';
@@ -95,9 +96,7 @@ export const googleCallbackController = asyncHandler(async (req: Request, res: R
         res.clearCookie('googleOAuthState', { path: '/' });
 
         const error = typeof req.query.error === 'string' ? req.query.error : 'unknown_error';
-        return res.redirect(
-            `${env.FRONTEND_ORIGIN}/login?error=${encodeURIComponent(error)}`,
-        );
+        return res.redirect(`${env.FRONTEND_ORIGIN}/login?error=${encodeURIComponent(error)}`);
     }
 
     // Safely extract the authorization code (guard against array/object query values)
@@ -132,3 +131,19 @@ export const googleCallbackController = asyncHandler(async (req: Request, res: R
 
     return res.redirect(`${env.FRONTEND_ORIGIN}/dashboard`);
 });
+
+/**
+ * POST /auth/refresh
+ * Refreshes the access token using the refresh token.
+ */
+export const refreshTokenController = asyncHandler(async (req: Request, res: Response) => {
+    const refreshToken = req.cookies.refreshToken;
+
+    const payload = await refreshTokenService(refreshToken);
+
+    setAuthCookies(res, payload);
+
+    return res.status(200).json({
+        message: "Access token refreshed successfully"
+    })
+})
