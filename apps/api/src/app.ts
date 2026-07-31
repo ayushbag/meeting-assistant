@@ -25,6 +25,13 @@ app.use(
     }),
 );
 
+// Prisma maps BigInt columns (e.g. Recording.size) to JS BigInt, which
+// JSON.stringify cannot serialize. Convert BigInt values to Number so every
+// res.json() payload serializes cleanly.
+app.set('json replacer', (_key: string, value: unknown) => {
+    return typeof value === 'bigint' ? Number(value) : value;
+});
+
 // health endpoint
 app.get('/health', (_req, res) => {
     res.status(200).json({

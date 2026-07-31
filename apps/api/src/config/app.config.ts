@@ -24,6 +24,13 @@ const envSchema = z.object({
 
     // AI
     GEMINI_API_KEY: z.string().optional(),
+
+    // Object Storage (MinIO / AWS S3)
+    S3_ENDPOINT: z.string().url(),
+    S3_REGION: z.string(),
+    S3_ACCESS_KEY: z.string(),
+    S3_SECRET_KEY: z.string(),
+    S3_BUCKET_NAME: z.string(),
 });
 
 export const env = envSchema.parse(process.env);
