@@ -14,8 +14,10 @@
   "license": "ISC",
   "devDependencies": {
     "@repo/db": "workspace:*",
+    "@repo/redis": "workspace:*",
     "@repo/typescript-config": "workspace:*",
     "@repo/storage": "workspace:*",
+    "@repo/queue": "workspace:*",
     "@types/cookie-parser": "^1.4.10",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",

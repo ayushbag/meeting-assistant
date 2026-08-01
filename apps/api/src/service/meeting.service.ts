@@ -16,6 +16,8 @@ import {
 } from '@repo/storage';
 import { getStorageClient } from '../config/storage.config.js';
 import { env } from '../config/app.config.js';
+import { getRecordingQueue } from '../config/queue.config.js';
+import { JOB_NAMES } from '@repo/queue';
 
 export const createMeetingService = async (
     body: z.infer<typeof createMeetingSchema>,
@@ -257,6 +259,22 @@ export const completeMultipartUploadService = async (
             size: head.size,
             status: RecordingStatus.UPLOADED,
         },
+    });
+
+    const job = await getRecordingQueue().add(
+        JOB_NAMES.PROCESS_RECORDING,
+        {
+            recordingId: recording.id,
+        },
+        {
+            jobId: recording.id,
+        },
+    );
+
+    console.log('Job added:', {
+        id: job.id,
+        name: job.name,
+        data: job.data,
     });
 
     return recording;
