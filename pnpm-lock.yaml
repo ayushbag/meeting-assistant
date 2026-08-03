@@ -96,6 +96,9 @@ importers:
       '@repo/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@repo/logger':
+        specifier: workspace:*
+        version: link:../../packages/logger
       '@repo/queue':
         specifier: workspace:*
         version: link:../../packages/queue

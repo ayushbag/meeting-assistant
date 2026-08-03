@@ -1,3 +1,4 @@
+import { logger } from "@repo/logger";
 import { getRecordingWorker } from "./config/worker.config.js";
 
 const worker = getRecordingWorker();
@@ -15,8 +16,11 @@ worker.on('completed', (job) => {
 });
 
 worker.on('failed', (job, err) => {
-    console.error(`❌ Job ${job?.id} failed`);
-    console.error(err);
+    logger.error({
+        jobId: job?.id,
+        queue: job?.queueName,
+        error: err
+    })
 });
 
 console.log('🎧 Listening for recording jobs...');
