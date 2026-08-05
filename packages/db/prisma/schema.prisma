@@ -87,13 +87,17 @@ model Recording {
   fileName String
   fileKey  String @unique
   fileUrl  String
-
   mimeType String
   size     BigInt
-
   duration Int?
 
   status RecordingStatus @default(UPLOADED)
+
+  // Extracted audio
+  audioFileName String?
+  audioFileKey  String?
+  audioMimeType String?
+  audioSize     BigInt?
 
   uploadedAt DateTime @default(now())
 

@@ -7,6 +7,7 @@ const envSchema = z.object({
     REDIS_URL: z.url(),
 
     GEMINI_API_KEY: z.string().optional(),
+    GEMINI_MODEL: z.string(),
 
     S3_ENDPOINT: z.url(),
     S3_REGION: z.string(),

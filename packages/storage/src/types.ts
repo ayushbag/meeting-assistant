@@ -1,4 +1,4 @@
-import type { GetObjectCommandOutput } from "@aws-sdk/client-s3";
+import type { GetObjectCommandOutput, PutObjectCommandInput } from "@aws-sdk/client-s3";
 import type { StorageClient } from "./client.js";
 
 export type StorageConfig = {
@@ -105,4 +105,37 @@ export type GetPresignedDownloadUrlInput = {
     bucket: string;
     fileKey: string;
     expiresInSeconds?: number;
+};
+
+export type UploadFileInput = {
+    client: StorageClient;
+    bucket: string;
+    fileKey: string;
+    body: PutObjectCommandInput["Body"];
+    mimeType: string;
+};
+
+export type UploadFileResult = {
+    fileKey: string;
+};
+
+/**
+ * Binary artifacts stored in object storage. Text artifacts (transcripts,
+ * summaries) live in the database and embeddings in a vector store, so they
+ * are intentionally absent here.
+ */
+export type ArtifactType = "audio" | "waveform" | "thumbnail" | "screenshot";
+
+export type UploadArtifactInput = {
+    client: StorageClient;
+    bucket: string;
+    meetingId: string;
+    artifactType: ArtifactType;
+    fileName: string;
+    body: PutObjectCommandInput["Body"];
+    mimeType: string;
+};
+
+export type UploadArtifactResult = {
+    fileKey: string;
 };

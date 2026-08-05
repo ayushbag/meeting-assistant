@@ -10,6 +10,7 @@ import { downloadRecording } from '@repo/storage';
 import { env } from '../config/app.config.js';
 import { getStorageClient } from '../config/storage.config.js';
 import { TEMP_DIR } from '../utils/paths.js';
+import { logger } from '@repo/logger';
 
 export const downloadRecordingToTemp = async (
     recordingId: string,
@@ -35,6 +36,9 @@ export const downloadRecordingToTemp = async (
     const writeStream = fs.createWriteStream(localPath);
 
     await pipeline(result.body as Readable, writeStream);
+
+    // logging
+    logger.info(`Local Path Video: ${localPath}`);
 
     return localPath;
 };

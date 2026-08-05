@@ -5,3 +5,5 @@ export * from './services/download.service.js';
 export * from './services/metadata.service.js';
 export * from './services/delete.service.js';
 export * from './services/presigned.service.js';
+export * from './services/upload.service.js';
+export * from './services/artifact.service.js';
