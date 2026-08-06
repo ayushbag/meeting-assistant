@@ -1,6 +1,5 @@
 import { logger } from '@repo/logger';
 import { getRecordingWorker } from './config/worker.config.js';
-import { ai } from './config/ai.config.js';
 
 const worker = getRecordingWorker();
 

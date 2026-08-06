@@ -8,6 +8,7 @@ const envSchema = z.object({
 
     GEMINI_API_KEY: z.string().optional(),
     GEMINI_MODEL: z.string(),
+    GEMINI_SPEECH_MODEL: z.string(),
 
     S3_ENDPOINT: z.url(),
     S3_REGION: z.string(),

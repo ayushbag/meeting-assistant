@@ -1,24 +1,7 @@
-export type AIProviderType =
-    | 'gemini'
-    | 'openai'
-    | 'ollama';
+import { SpeechToTextConfig } from './speech/types.js';
+import { TextGenerationConfig } from './text/types.js';
 
 export interface AIConfig {
-    provider: AIProviderType;
-    apiKey?: string;
-    model: string;
-}
-
-export interface GenerateTextRequest {
-    prompt: string;
-}
-
-export interface GenerateTextResponse {
-    text: string;
-}
-
-export interface AIProvider {
-    generateText(
-        request: GenerateTextRequest,
-    ): Promise<GenerateTextResponse>
+    textGeneration: TextGenerationConfig;
+    speechToText: SpeechToTextConfig;
 }

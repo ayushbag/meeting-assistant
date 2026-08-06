@@ -1,7 +1,12 @@
-import { AIConfig, AIProvider, GenerateTextRequest, GenerateTextResponse } from '../types.js';
 import { GoogleGenAI } from '@google/genai';
+import {
+    GenerateTextRequest,
+    GenerateTextResponse,
+    TextGenerationConfig,
+    TextGenerationProvider,
+} from '../types.js';
 
-export const createGeminiProvider = (config: AIConfig): AIProvider => {
+export const createGeminiTextProvider = (config: TextGenerationConfig): TextGenerationProvider => {
     const client = new GoogleGenAI({
         apiKey: config.apiKey,
     });

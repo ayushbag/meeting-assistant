@@ -8,6 +8,7 @@ import {
     updateRecordingAudio,
     uploadExtractedAudio,
 } from '../services/audio.service.js';
+import { createTranscript, transcribeAudio } from '../services/transcription.service.js';
 
 export const processRecordingJob = async (job: Job<RecordingProcessingJob>) => {
     console.log('Processing:', job.data.recordingId);
@@ -37,6 +38,12 @@ export const processRecordingJob = async (job: Job<RecordingProcessingJob>) => {
 
         // Persists uploaded audio information
         await updateRecordingAudio(recording.id, uploadedAudio);
+
+        // generate audio to text
+        const transcript = await transcribeAudio(wavPath);
+
+        // upload the generated transcript to DB
+        await createTranscript(recording.meetingId, transcript);
     } finally {
         // cleanup temp files
         await cleanupTempFiles(localVideoPath, wavPath);
