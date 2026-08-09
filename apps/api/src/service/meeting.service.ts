@@ -16,7 +16,7 @@ import {
 } from '@repo/storage';
 import { getStorageClient } from '../config/storage.config.js';
 import { env } from '../config/app.config.js';
-import { getRecordingQueue } from '../config/queue.config.js';
+import { getMediaExtractionQueue } from '../config/queue.config.js';
 import { JOB_NAMES } from '@repo/queue';
 
 export const createMeetingService = async (
@@ -261,8 +261,8 @@ export const completeMultipartUploadService = async (
         },
     });
 
-    const job = await getRecordingQueue().add(
-        JOB_NAMES.PROCESS_RECORDING,
+    const job = await getMediaExtractionQueue().add(
+        JOB_NAMES.EXTRACT_AUDIO,
         {
             recordingId: recording.id,
         },

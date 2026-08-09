@@ -1,21 +1,24 @@
-import { createRecordingQueue } from '@repo/queue';
+import { createMediaExtractionQueue } from '@repo/queue';
 import { getRedisConnection } from './redis.config.js';
 
-let recordingQueue: ReturnType<typeof createRecordingQueue> | undefined;
+let mediaExtractionQueue: ReturnType<typeof createMediaExtractionQueue> | undefined;
 
 /**
- * Returns the singleton recording-processing queue, creating it lazily on first use.
+ * Returns the singleton media-extraction queue, creating it lazily on first use.
  * A single BullMQ Queue instance is designed to be shared across the app (jobs are
  * enqueued through the same instance), so it should never be instantiated per-request.
+ *
+ * Upload completion enqueues EXTRACT_AUDIO here; the worker extracts the 16kHz mono
+ * WAV and then enqueues the AI job to the ai-processing queue.
  *
  * Default job options:
  * - attempts: 3 retries before the job is marked failed
  * - backoff: exponential backoff starting at 5s between retries
  * - removeOnComplete/removeOnFail: cap the completed/failed job sets to keep Redis memory bounded
  */
-export const getRecordingQueue = (): ReturnType<typeof createRecordingQueue> => {
-    if (!recordingQueue) {
-        recordingQueue = createRecordingQueue({
+export const getMediaExtractionQueue = (): ReturnType<typeof createMediaExtractionQueue> => {
+    if (!mediaExtractionQueue) {
+        mediaExtractionQueue = createMediaExtractionQueue({
             connection: getRedisConnection(),
             defaultJobOptions: {
                 attempts: 3,
@@ -25,5 +28,5 @@ export const getRecordingQueue = (): ReturnType<typeof createRecordingQueue> => 
             },
         });
     }
-    return recordingQueue;
+    return mediaExtractionQueue;
 };

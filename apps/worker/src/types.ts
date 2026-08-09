@@ -25,7 +25,7 @@ export type MediaFileMetadata = {
     size: number;
     bitRate: number;
     format: string;
-    video: {
+    video?: {
         codec: string;
         width: number;
         height: number;

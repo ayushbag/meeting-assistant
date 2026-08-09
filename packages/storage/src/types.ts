@@ -1,8 +1,12 @@
-import type { GetObjectCommandOutput, PutObjectCommandInput } from "@aws-sdk/client-s3";
-import type { StorageClient } from "./client.js";
+import type { GetObjectCommandOutput, PutObjectCommandInput } from '@aws-sdk/client-s3';
+import type { StorageClient } from './client.js';
 
 export type StorageConfig = {
-    endpoint: string;
+    /**
+     * Optional S3-compatible endpoint override (e.g. MinIO). Leave unset to
+     * use the default AWS S3 endpoints for `region`.
+     */
+    endpoint?: string;
     region: string;
     accessKeyId: string;
     secretAccessKey: string;
@@ -68,7 +72,7 @@ export type DownloadRecordingInput = {
 };
 
 export type DownloadRecordingResult = {
-    body: GetObjectCommandOutput["Body"];
+    body: GetObjectCommandOutput['Body'];
     mimeType?: string;
     size?: number;
     lastModified?: Date;
@@ -111,7 +115,7 @@ export type UploadFileInput = {
     client: StorageClient;
     bucket: string;
     fileKey: string;
-    body: PutObjectCommandInput["Body"];
+    body: PutObjectCommandInput['Body'];
     mimeType: string;
 };
 
@@ -124,7 +128,7 @@ export type UploadFileResult = {
  * summaries) live in the database and embeddings in a vector store, so they
  * are intentionally absent here.
  */
-export type ArtifactType = "audio" | "waveform" | "thumbnail" | "screenshot";
+export type ArtifactType = 'audio' | 'waveform' | 'thumbnail' | 'screenshot';
 
 export type UploadArtifactInput = {
     client: StorageClient;
@@ -132,7 +136,7 @@ export type UploadArtifactInput = {
     meetingId: string;
     artifactType: ArtifactType;
     fileName: string;
-    body: PutObjectCommandInput["Body"];
+    body: PutObjectCommandInput['Body'];
     mimeType: string;
 };
 

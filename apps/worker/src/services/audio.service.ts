@@ -13,22 +13,35 @@ import { prisma } from '@repo/db';
 
 const execFileAsync = promisify(execFile);
 
-export const extractAudio = async (inputPath: string): Promise<string> => {
+export interface ExtractAudioOptions {
+    /**
+     * Stream-copy the source audio into the WAV container instead of decoding
+     * + resampling + re-encoding. Only valid when the source audio is already
+     * 16 kHz mono PCM (verified via ffprobe by the caller) — otherwise it
+     * produces garbage or errors. Near-zero CPU.
+     */
+    streamCopy?: boolean;
+}
+
+export const extractAudio = async (
+    inputPath: string,
+    options: ExtractAudioOptions = {},
+): Promise<string> => {
     const outputPath = inputPath.replace(/\.[^.]+$/, '.wav');
 
-    await execFileAsync('ffmpeg', [
-        '-y',
-        '-i',
-        inputPath,
-        '-vn',
-        '-ac',
-        '1',
-        '-ar',
-        '16000',
-        '-c:',
-        'pcm_s16le',
-        outputPath,
-    ]);
+    // -threads 2 caps decoder threads so a burst of extraction jobs can never
+    // saturate the whole box and starve the AI queue (Phase 1 decision D4/D8).
+    const args = ['-y', '-threads', '2', '-i', inputPath, '-vn'];
+
+    if (options.streamCopy) {
+        args.push('-c:a', 'copy');
+    } else {
+        args.push('-ac', '1', '-ar', '16000', '-c:a', 'pcm_s16le');
+    }
+
+    args.push(outputPath);
+
+    await execFileAsync('ffmpeg', args);
 
     // logging
     logger.info(`Audio extracted at path: ${outputPath}`);

@@ -12,7 +12,12 @@ import { getStorageClient } from '../config/storage.config.js';
 import { TEMP_DIR } from '../utils/paths.js';
 import { logger } from '@repo/logger';
 
-export const downloadRecordingToTemp = async (
+/**
+ * Streams any stored object (source recording OR extracted audio WAV) to a
+ * temp file. Used by the media processor for the source video and by the AI
+ * processor for the extracted audio.
+ */
+export const downloadToTemp = async (
     recordingId: string,
     fileName: string,
     fileKey: string,
@@ -30,7 +35,7 @@ export const downloadRecordingToTemp = async (
     });
 
     if (!result.body) {
-        throw new Error('Recording body is empty');
+        throw new Error('Object body is empty');
     }
 
     const writeStream = fs.createWriteStream(localPath);
@@ -38,7 +43,7 @@ export const downloadRecordingToTemp = async (
     await pipeline(result.body as Readable, writeStream);
 
     // logging
-    logger.info(`Local Path Video: ${localPath}`);
+    logger.info(`Local Path: ${localPath}`);
 
     return localPath;
 };

@@ -15,7 +15,9 @@ export const getStorageClient = (): StorageClient => {
             region: env.S3_REGION,
             accessKeyId: env.S3_ACCESS_KEY,
             secretAccessKey: env.S3_SECRET_KEY,
-            forcePathStyle: true,
+            // Path style only applies to S3-compatible endpoints (MinIO); real
+            // AWS S3 uses virtual-hosted style automatically (D6).
+            forcePathStyle: env.S3_ENDPOINT ? env.S3_FORCE_PATH_STYLE === 'true' : false,
         });
     }
     return storageClient;

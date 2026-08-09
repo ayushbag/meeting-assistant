@@ -23,12 +23,11 @@ export const getMediaMetadata = async (filePath: string): Promise<MediaFileMetad
 
     const metadata: FFprobeOutput = JSON.parse(stdout);
 
+    // Audio-only uploads are valid (the product's canonical artifact is the WAV,
+    // and clients may upload audio files directly), so a video stream is NOT
+    // required. Extraction validation (an audio stream must exist) happens in
+    // the media processor.
     const videoStream = metadata.streams.find((stream) => stream.codec_type === 'video');
-
-    if (!videoStream) {
-        throw new Error('Video stream not found.');
-    }
-
     const audioStream = metadata.streams.find((stream) => stream.codec_type === 'audio');
 
     return {
@@ -37,12 +36,14 @@ export const getMediaMetadata = async (filePath: string): Promise<MediaFileMetad
         bitRate: Number(metadata.format.bit_rate),
         format: metadata.format.format_name,
 
-        video: {
-            codec: videoStream.codec_name,
-            width: videoStream.width ?? 0,
-            height: videoStream.height ?? 0,
-            fps: parseFrameRate(videoStream.avg_frame_rate ?? '0/1'),
-        },
+        video: videoStream
+            ? {
+                  codec: videoStream.codec_name,
+                  width: videoStream.width ?? 0,
+                  height: videoStream.height ?? 0,
+                  fps: parseFrameRate(videoStream.avg_frame_rate ?? '0/1'),
+              }
+            : undefined,
 
         audio: audioStream
             ? {

@@ -19,9 +19,17 @@ export const transcribeAudio = async (wavPath: string): Promise<string> => {
 };
 
 export const createTranscript = async (meetingId: string, content: string) => {
-    const transcript = await prisma.transcript.create({
-        data: {
+    // Upsert (Transcript.meetingId is @unique) so a retried AI job never crashes
+    // on a duplicate after the first attempt already persisted the transcript.
+    const transcript = await prisma.transcript.upsert({
+        where: {
             meetingId,
+        },
+        create: {
+            meetingId,
+            content,
+        },
+        update: {
             content,
         },
     });
@@ -34,5 +42,5 @@ export const createTranscript = async (meetingId: string, content: string) => {
         'Transcript created',
     );
 
-    return transcript
+    return transcript;
 };

@@ -12,6 +12,9 @@ You are a professional transcription service. Transcribe the provided audio verb
 - Label speaker turns as "Speaker 1", "Speaker 2", etc. when distinguishable.
 - Prefix each speaker turn with a [MM:SS] timestamp.
 - Mark unintelligible audio as [inaudible].
+- ALWAYS transcribe in the Latin alphabet (romanized script). For Hindi and any other
+  Indic languages, write the words in romanized Latin script exactly as they sound
+  (e.g. "Namaste, aap kaise hain?"). NEVER use Devanagari or any other native script.
 `.trim();
 
 export const createGeminiSpeechProvider = (config: SpeechToTextConfig): SpeechToTextProvider => {

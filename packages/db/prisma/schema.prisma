@@ -35,6 +35,26 @@ enum ChatRole {
   ASSISTANT
 }
 
+enum MeetingType {
+  LECTURE
+  BUSINESS
+  SALES
+  INTERVIEW
+  STANDUP
+  BRAINSTORM
+  REVIEW
+  OTHER
+}
+
+enum IntelligenceStatus {
+  PENDING
+  CLASSIFYING
+  EXTRACTING
+  MERGING
+  READY
+  FAILED
+}
+
 model User {
   id String @id @default(cuid())
 
@@ -72,6 +92,10 @@ model Meeting {
 
   participants Participant[]
   chats        ChatMessage[]
+
+  type MeetingType?
+
+  intelligence MeetingIntelligence?
 
   @@index([createdById])
   @@index([status])
@@ -162,4 +186,31 @@ model ChatMessage {
 
   @@index([meetingId])
   @@map("chat_messages")
+}
+
+model MeetingIntelligence {
+  id String @id @default(cuid())
+
+  meetingId String  @unique
+  meeting   Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+
+  meetingType MeetingType
+  confidence  Float?
+  goal        String?
+  language    String?
+
+  status IntelligenceStatus @default(PENDING)
+
+  payload Json?
+
+  promptVersion String?
+  model         String?
+  segementCount  Int?
+
+  error String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("meeting_intelligence")
 }
