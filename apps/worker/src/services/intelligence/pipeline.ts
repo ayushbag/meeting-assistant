@@ -1,3 +1,4 @@
+import { logger } from '@repo/logger';
 import { classifyMeeting } from './classifier.js';
 import { verifyEvidence } from './evidence.js';
 import { extractIntelligence } from './extractor.js';
@@ -5,22 +6,32 @@ import { mergeIntelligence } from './merger.js';
 import { persistIntelligence } from './persist.js';
 import { routeMeeting } from './router.js';
 import { segmentTranscript } from './segmenter.js';
+import { createIntelligenceStatus, updateIntelligenceStatus } from './status.js';
 
 export const runIntelligencePipeline = async (transcript: string, meetingId: string) => {
+    await createIntelligenceStatus(meetingId);
+
     // classify the meeting
+    await updateIntelligenceStatus(meetingId, 'CLASSIFYING');
+
     const classification = await classifyMeeting(transcript);
 
-    console.log('classification ✅');
+    logger.info({ meetingId }, 'Meeting classified');
 
     // route to the correct intelligence pipeline
     const pipeline = routeMeeting(classification);
 
-    console.log('routeMeeting ✅');
+    logger.info(
+        { meetingId, meetingType: classification.meetingType },
+        'Intelligence pipeline routed',
+    );
 
     // segment the transcript
+    await updateIntelligenceStatus(meetingId, 'EXTRACTING');
+
     const segments = segmentTranscript(transcript);
 
-    console.log('segmentation ✅');
+    logger.info({ meetingId, segmentCount: segments.length }, 'Transcript segmented');
 
     // extract intelligence from each segement
     const results = [];
@@ -34,17 +45,21 @@ export const runIntelligencePipeline = async (transcript: string, meetingId: str
         });
     }
 
-    console.log('extraction ✅');
+    logger.info({ meetingId, segmentCount: segments.length }, 'Intelligence extracted');
 
     // merge segment intelligence
+    await updateIntelligenceStatus(meetingId, 'MERGING');
+
     const intelligence = await mergeIntelligence(results, pipeline);
 
-    console.log('merged ✅');
+    logger.info({ meetingId }, 'Intelligence merged');
 
+    // Verify evidence
     verifyEvidence(intelligence, segments);
 
-    console.log('evidence verified ✅');
+    logger.info({ meetingId }, 'Evidence verified');
 
+    // persist final intelligence
     await persistIntelligence({
         meetingId,
         classification,
@@ -52,7 +67,7 @@ export const runIntelligencePipeline = async (transcript: string, meetingId: str
         segmentCount: segments.length,
     });
 
-    console.log('intelligence added to db ✅');
+    logger.info({ meetingId }, 'Intelligence persisted');
 
     return {
         classification,
