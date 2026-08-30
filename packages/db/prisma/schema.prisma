@@ -205,7 +205,7 @@ model MeetingIntelligence {
 
   promptVersion String?
   model         String?
-  segementCount  Int?
+  segmentCount  Int?
 
   error String?
 
