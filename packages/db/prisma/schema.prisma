@@ -194,7 +194,8 @@ model MeetingIntelligence {
   meetingId String  @unique
   meeting   Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
 
-  meetingType MeetingType
+  meetingType MeetingType?
+  
   confidence  Float?
   goal        String?
   language    String?
