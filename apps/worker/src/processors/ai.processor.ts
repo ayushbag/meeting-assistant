@@ -6,6 +6,7 @@ import { getRecordingById } from '../services/recording.service.js';
 import { downloadToTemp } from '../services/storage.service.js';
 import { cleanupTempFiles } from '../services/media.service.js';
 import { createTranscript, transcribeAudio } from '../services/transcription.service.js';
+import { runIntelligencePipeline } from '../services/intelligence/pipeline.js';
 
 /**
  * Phase 1 AI-processing job (high concurrency — this step is network-bound):
@@ -38,6 +39,9 @@ export const processAIJob = async (job: Job<AIProcessingJob>) => {
 
         // Persist the transcript (idempotent — one transcript per meeting)
         await createTranscript(recording.meetingId, transcript);
+
+        // Analyze transcript and persist meeting intelligence
+        await runIntelligencePipeline(transcript, recording.meetingId);
     } finally {
         // Cleanup temp files
         await cleanupTempFiles(wavPath);
