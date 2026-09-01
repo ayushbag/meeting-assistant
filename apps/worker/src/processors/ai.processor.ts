@@ -11,7 +11,8 @@ import { runIntelligencePipeline } from '../services/intelligence/pipeline.js';
 /**
  * Phase 1 AI-processing job (high concurrency — this step is network-bound):
  *
- *   download extracted WAV → Gemini transcription → persist transcript.
+ * download extracted WAV → Gemini transcription → persist transcript →
+ * analyze meeting intelligence → persist intelligence.
  *
  * Runs on the same box as the media worker but on its own queue, so ffmpeg
  * bursts can never starve it (learning/architecture-decisions.md §6/§7).
