@@ -25,23 +25,41 @@ import { runIntelligencePipeline } from "./pipeline.js";
 
 // type: business
 const transcript = `
-Speaker 1: Let's discuss the launch of our new analytics platform.
+Speaker 1: Good morning everyone. Today I want to finalize the launch plan for our customer analytics platform.
 
-Speaker 2: The product is almost ready, but we still need two more days of testing.
+Speaker 2: The backend is almost ready. We completed the API integration, but load testing showed some performance issues when we crossed 5,000 concurrent requests.
 
-Speaker 1: Then I think we should move the launch to September 15th.
+Speaker 3: How much time do we need to fix that?
 
-Speaker 2: Agreed. September 15th works for us.
+Speaker 2: Around four days. We can optimize the database queries and add caching for the most frequently requested data.
 
-Speaker 1: One concern is that our external vendor hasn't confirmed the API capacity yet.
+Speaker 1: Okay. Let's target Friday for the performance fixes. What about the frontend?
 
-Speaker 2: Yes, that's a risk. I'll contact them tomorrow and get confirmation before Friday.
+Speaker 3: The dashboard is about 90% complete. The remaining work is mainly responsive design and the export-to-CSV feature.
 
-Speaker 1: Good. We also discussed increasing the marketing budget, but we haven't decided on the amount yet.
+Speaker 1: Can you finish those by next Wednesday?
 
-Speaker 2: Let's discuss the budget in our next meeting.
+Speaker 3: Yes, that should be possible.
+
+Speaker 2: We should also discuss the launch budget. The current marketing estimate is ₹3 lakh, but the team recommends increasing it to ₹4 lakh to support the initial campaign.
+
+Speaker 1: Let's keep the budget at ₹3 lakh for now and review the results after the first two weeks.
+
+Speaker 3: One concern is that we don't have enough production data for the initial testing phase.
+
+Speaker 2: We can use anonymized historical data until we have enough live data.
+
+Speaker 1: Good. Let's proceed with that approach.
+
+Speaker 1: So the decisions are: backend performance fixes by Friday, frontend completion by next Wednesday, and the initial marketing budget stays at ₹3 lakh.
+
+Speaker 2: I'll handle the database optimization and caching work.
+
+Speaker 3: I'll finish responsive design and CSV export.
+
+Speaker 1: Great. We'll have a follow-up meeting next Thursday to review progress and decide the final launch date.
 `
 
-const pipeline = await runIntelligencePipeline(transcript, 'cmtittcxg0000i8tu1fpm8xk1');
+const pipeline = await runIntelligencePipeline(transcript, 'cmtllxd610002tstu70kx3uz3');
 
 console.dir(pipeline, { depth: null });

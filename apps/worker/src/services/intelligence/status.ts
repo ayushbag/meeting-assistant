@@ -32,3 +32,16 @@ export const updateIntelligenceStatus = async (
         },
     });
 };
+
+export const failIntelligence = async (
+    meetingId: string,
+    error: unknown,
+) => {
+    return prisma.meetingIntelligence.update({
+        where: { meetingId },
+        data: {
+            status: 'FAILED',
+            error: error instanceof Error ? error.message : String(error),
+        },
+    });
+};

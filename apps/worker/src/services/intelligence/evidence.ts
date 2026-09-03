@@ -28,31 +28,48 @@ const findSourceSegment = (
     return matchingSegment.index;
 };
 
+const verifyEvidenceRecursive = (
+    value: unknown,
+    segments: TranscriptSegment[],
+): void => {
+    if (!value || typeof value !== 'object') {
+        return;
+    }
+
+    if (Array.isArray(value)) {
+        for (const item of value) {
+            verifyEvidenceRecursive(item, segments);
+        }
+        return;
+    }
+
+    const object = value as Record<string, unknown>;
+
+    if (
+        object.evidence &&
+        typeof object.evidence === 'object' &&
+        !Array.isArray(object.evidence)
+    ) {
+        const evidence = object.evidence as Record<string, unknown>;
+
+        if (typeof evidence.quote === 'string') {
+            evidence.sourceSegment = findSourceSegment(
+                evidence.quote,
+                segments,
+            );
+        }
+    }
+
+    for (const child of Object.values(object)) {
+        verifyEvidenceRecursive(child, segments);
+    }
+};
+
 export const verifyEvidence = (
     intelligence: CommonIntelligence,
     segments: TranscriptSegment[],
 ): CommonIntelligence => {
-    for (const moment of intelligence.importantMoments) {
-        if (!moment.evidence) {
-            continue;
-        }
-
-        moment.evidence.sourceSegment = findSourceSegment(
-            moment.evidence.quote,
-            segments,
-        );
-    }
-
-    for (const actionItem of intelligence.actionItems) {
-        if (!actionItem.evidence) {
-            continue;
-        }
-
-        actionItem.evidence.sourceSegment = findSourceSegment(
-            actionItem.evidence.quote,
-            segments,
-        );
-    }
+    verifyEvidenceRecursive(intelligence, segments);
 
     return intelligence;
 };
