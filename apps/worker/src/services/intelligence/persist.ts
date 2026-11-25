@@ -11,6 +11,7 @@ import { CommonIntelligence } from "./schemas/common.js";
 type PersistIntelligenceInput = {
     meetingId: string;
     classification: MeetingClassification;
+    resolvedMeetingType: 'business' | 'other';
     intelligence: CommonIntelligence;
     segmentCount: number;
     promptVersion?: string;
@@ -20,62 +21,39 @@ type PersistIntelligenceInput = {
 export const persistIntelligence = async (
     input: PersistIntelligenceInput,
 ) => {
-    return prisma.meetingIntelligence.upsert({
-        where: {
-            meetingId: input.meetingId,
-        },
+    const meetingType = input.resolvedMeetingType.toUpperCase() as 'BUSINESS' | 'OTHER';
 
-        create: {
-            meetingId: input.meetingId,
-            meetingType: input.classification.meetingType.toUpperCase() as
-                | 'LECTURE'
-                | 'BUSINESS'
-                | 'SALES'
-                | 'INTERVIEW'
-                | 'STANDUP'
-                | 'BRAINSTORM'
-                | 'REVIEW'
-                | 'OTHER',
-
-            confidence: input.classification.confidence,
-            goal: input.classification.goal,
-            language: input.classification.language,
-
-            status: 'READY',
-
-            payload: input.intelligence,
-
-            promptVersion: input.promptVersion,
-            model: input.model,
-
-            segmentCount: input.segmentCount,
-        },
-
-        update: {
-            meetingType: input.classification.meetingType.toUpperCase() as
-                | 'LECTURE'
-                | 'BUSINESS'
-                | 'SALES'
-                | 'INTERVIEW'
-                | 'STANDUP'
-                | 'BRAINSTORM'
-                | 'REVIEW'
-                | 'OTHER',
-
-            confidence: input.classification.confidence,
-            goal: input.classification.goal,
-            language: input.classification.language,
-
-            status: 'READY',
-
-            payload: input.intelligence,
-
-            promptVersion: input.promptVersion,
-            model: input.model,
-
-            segmentCount: input.segmentCount,
-
-            error: null,
-        },
-    });
+    return prisma.$transaction([
+        prisma.meeting.update({
+            where: { id: input.meetingId },
+            data: { type: meetingType },
+        }),
+        prisma.meetingIntelligence.upsert({
+            where: { meetingId: input.meetingId },
+            create: {
+                meetingId: input.meetingId,
+                meetingType,
+                confidence: input.classification.confidence,
+                goal: input.classification.goal,
+                language: input.classification.language,
+                status: 'READY',
+                payload: input.intelligence,
+                promptVersion: input.promptVersion,
+                model: input.model,
+                segmentCount: input.segmentCount,
+            },
+            update: {
+                meetingType,
+                confidence: input.classification.confidence,
+                goal: input.classification.goal,
+                language: input.classification.language,
+                status: 'READY',
+                payload: input.intelligence,
+                promptVersion: input.promptVersion,
+                model: input.model,
+                segmentCount: input.segmentCount,
+                error: null,
+            },
+        }),
+    ]);
 };

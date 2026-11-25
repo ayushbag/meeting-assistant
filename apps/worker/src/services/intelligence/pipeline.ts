@@ -43,6 +43,7 @@ export const runIntelligencePipeline = async (transcript: string, meetingId: str
             await persistIntelligence({
                 meetingId,
                 classification: EMPTY_GENERIC_CLASSIFICATION,
+                resolvedMeetingType: 'other',
                 intelligence: EMPTY_GENERIC_INTELLIGENCE,
                 segmentCount: 0,
             });
@@ -66,7 +67,11 @@ export const runIntelligencePipeline = async (transcript: string, meetingId: str
         const pipeline = routeMeeting(classification);
 
         logger.info(
-            { meetingId, meetingType: classification.meetingType },
+            {
+                meetingId,
+                classifiedAs: classification.meetingType,
+                routedTo: pipeline.meetingType,
+            },
             'Intelligence pipeline routed',
         );
 
@@ -107,6 +112,7 @@ export const runIntelligencePipeline = async (transcript: string, meetingId: str
         await persistIntelligence({
             meetingId,
             classification,
+            resolvedMeetingType: pipeline.meetingType,
             intelligence,
             segmentCount: segments.length,
         });
