@@ -1,11 +1,23 @@
 import { Job } from 'bullmq';
-import type { AIProcessingJob } from '@repo/queue';
+import { prisma } from '@repo/db';
+import { AI_STAGES, type AIProcessingJob } from '@repo/queue';
 import { logger } from '@repo/logger';
 
+import { env } from '../config/app.config.js';
 import { getRecordingById } from '../services/recording.service.js';
+import {
+    markCompleted,
+    markFailed,
+    markSummarizing,
+    startAIProcessing,
+} from '../services/meeting-status.service.js';
 import { downloadToTemp } from '../services/storage.service.js';
 import { cleanupTempFiles } from '../services/media.service.js';
-import { createTranscript, transcribeAudio } from '../services/transcription.service.js';
+import {
+    createTranscript,
+    isUsableTranscript,
+    transcribeAudio,
+} from '../services/transcription.service.js';
 import { runIntelligencePipeline } from '../services/intelligence/pipeline.js';
 
 /**
@@ -18,31 +30,78 @@ import { runIntelligencePipeline } from '../services/intelligence/pipeline.js';
  * bursts can never starve it (learning/architecture-decisions.md §6/§7).
  */
 export const processAIJob = async (job: Job<AIProcessingJob>) => {
-    logger.info({ recordingId: job.data.recordingId }, 'Transcribing audio...');
+    const fromIntelligence = job.data.fromStage === AI_STAGES.INTELLIGENCE;
+
+    logger.info(
+        {
+            recordingId: job.data.recordingId,
+            fromStage: job.data.fromStage ?? AI_STAGES.TRANSCRIPTION,
+        },
+        fromIntelligence ? 'Resuming intelligence from stored transcript...' : 'Transcribing audio...',
+    );
 
     const recording = await getRecordingById(job.data.recordingId);
-
-    if (!recording.audioFileKey) {
-        throw new Error('Recording has no extracted audio; media-extraction job must run first.');
-    }
 
     let wavPath = '';
 
     try {
-        wavPath = await downloadToTemp(
-            recording.id,
-            recording.audioFileName ?? 'audio.wav',
-            recording.audioFileKey,
-        );
+        let transcript: string;
 
-        // Generate audio → text
-        const transcript = await transcribeAudio(wavPath);
+        if (fromIntelligence) {
+            // Transcript is already durable: skip download and Gemini speech entirely.
+            await markSummarizing(recording.id, recording.meetingId);
 
-        // Persist the transcript (idempotent — one transcript per meeting)
-        await createTranscript(recording.meetingId, transcript);
+            const stored = await prisma.transcript.findUnique({
+                where: { meetingId: recording.meetingId },
+                select: { content: true },
+            });
+
+            if (!stored?.content?.trim()) {
+                throw new Error('Stored transcript is missing or empty; cannot resume intelligence.');
+            }
+
+            transcript = stored.content;
+        } else {
+            await startAIProcessing(recording.id, recording.meetingId);
+
+            if (!recording.audioFileKey) {
+                throw new Error('Recording has no extracted audio; media-extraction job must run first.');
+            }
+
+            wavPath = await downloadToTemp(
+                recording.id,
+                recording.audioFileName ?? 'audio.wav',
+                recording.audioFileKey,
+            );
+
+            transcript = await transcribeAudio(wavPath);
+
+            // Upsert keeps one transcript row even when an earlier attempt succeeded.
+            await createTranscript(recording.meetingId, transcript);
+
+            if (!isUsableTranscript(transcript)) {
+                logger.info(
+                    {
+                        meetingId: recording.meetingId,
+                        length: transcript.trim().length,
+                        minimum: env.MIN_TRANSCRIPT_CHARS,
+                    },
+                    'Transcript below minimum; skipping intelligence extraction',
+                );
+            }
+
+            // Summary generation is reserved for the next stage; the recording is
+            // already at the boundary where that stage will pick up.
+            await markSummarizing(recording.id, recording.meetingId);
+        }
 
         // Analyze transcript and persist meeting intelligence
         await runIntelligencePipeline(transcript, recording.meetingId);
+
+        await markCompleted(recording.id, recording.meetingId);
+    } catch (error) {
+        await markFailed(recording.id, recording.meetingId, error);
+        throw error;
     } finally {
         // Cleanup temp files
         await cleanupTempFiles(wavPath);

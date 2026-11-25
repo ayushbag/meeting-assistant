@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises';
+
 import { GoogleGenAI } from '@google/genai';
 import {
     SpeechToTextConfig,
@@ -24,18 +26,64 @@ export const createGeminiSpeechProvider = (config: SpeechToTextConfig): SpeechTo
 
     return {
         async transcribe(request: TranscribeRequest): Promise<TranscribeResponse> {
-            const file = await client.files.upload({
-                file: request.audioPath,
-                config: {
-                    mimeType: request.mimeType,
+            const bytes = await readFile(request.audioPath);
+            const arrayBuffer = bytes.buffer.slice(
+                bytes.byteOffset,
+                bytes.byteOffset + bytes.byteLength,
+            ) as ArrayBuffer;
+
+            const start = await fetch(
+                `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${config.apiKey}`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Goog-Upload-Protocol': 'resumable',
+                        'X-Goog-Upload-Command': 'start',
+                        'X-Goog-Upload-Header-Content-Length': String(bytes.length),
+                        'X-Goog-Upload-Header-Content-Type': request.mimeType,
+                        'X-Goog-Upload-File-Name': 'audio.wav',
+                    },
+                    body: JSON.stringify({
+                        file: {
+                            mimeType: request.mimeType,
+                            sizeBytes: String(bytes.length),
+                        },
+                    }),
                 },
+            );
+
+            if (!start.ok) {
+                throw new Error(`Gemini upload start failed: ${await start.text()}`);
+            }
+
+            const uploadUrl = start.headers.get('x-goog-upload-url');
+            if (!uploadUrl) {
+                throw new Error('Gemini upload URL missing from response');
+            }
+
+            const uploaded = await fetch(uploadUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': request.mimeType,
+                    'X-Goog-Upload-Command': 'upload, finalize',
+                    'X-Goog-Upload-Offset': '0',
+                },
+                body: arrayBuffer,
             });
 
-            console.log('Uploaded:', file);
+            if (!uploaded.ok) {
+                throw new Error(`Gemini upload failed: ${await uploaded.text()}`);
+            }
+
+            const { file } = (await uploaded.json()) as {
+                file?: { uri?: string; name?: string; mimeType?: string };
+            };
+            if (!file?.uri) {
+                throw new Error('Gemini upload response missing file URI');
+            }
 
             try {
-                console.log('Generating transcript...');
-
                 const response = await client.models.generateContent({
                     model: config.model,
                     contents: {
@@ -55,11 +103,7 @@ export const createGeminiSpeechProvider = (config: SpeechToTextConfig): SpeechTo
                 return {
                     text: response.text ?? '',
                 };
-            } catch(err) {
-                console.dir(err, { depth: null })
-                throw err;
             } finally {
-                // Clean up the uploaded file from Gemini storage.
                 // Deletion is best-effort: never mask the transcription error.
                 if (file.name) {
                     await client.files.delete({ name: file.name }).catch(() => {});

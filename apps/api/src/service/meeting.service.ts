@@ -356,9 +356,11 @@ export const getMeetingStatusService = async (meetingId: string, userId: string)
         },
         select: {
             status: true,
+            error: true,
             recording: {
                 select: {
                     status: true,
+                    error: true,
                 },
             },
             intelligence: {
@@ -378,6 +380,9 @@ export const getMeetingStatusService = async (meetingId: string, userId: string)
         meetingStatus: meeting.status,
         recordingStatus: meeting.recording?.status ?? null,
         intelligenceStatus: meeting.intelligence?.status ?? null,
-        error: meeting.intelligence?.error ?? null,
+        error: meeting.error ?? meeting.recording?.error ?? meeting.intelligence?.error ?? null,
+        meetingError: meeting.error,
+        recordingError: meeting.recording?.error ?? null,
+        intelligenceError: meeting.intelligence?.error ?? null,
     }
 };

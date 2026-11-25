@@ -23,6 +23,10 @@ const envSchema = z.object({
     QDRANT_COLLECTION: z.string(),    
 
     GEMINI_EMBEDDING_MODEL: z.string(),
+
+    // Transcripts at or above this many non-whitespace characters are eligible
+    // for intelligence extraction. Shorter ones get an explicit empty payload.
+    MIN_TRANSCRIPT_CHARS: z.coerce.number().int().nonnegative().default(20),
 });
 
 export const env = envSchema.parse(process.env);

@@ -1,5 +1,6 @@
 import { prisma } from '@repo/db';
 import { ai } from '../config/ai.config.js';
+import { env } from '../config/app.config.js';
 import { logger } from '@repo/logger';
 
 export const transcribeAudio = async (wavPath: string): Promise<string> => {
@@ -17,6 +18,10 @@ export const transcribeAudio = async (wavPath: string): Promise<string> => {
 
     return response.text;
 };
+
+/** Empty and very short transcripts must never reach the extraction prompts. */
+export const isUsableTranscript = (text: string): boolean =>
+    text.trim().length >= env.MIN_TRANSCRIPT_CHARS;
 
 export const createTranscript = async (meetingId: string, content: string) => {
     // Upsert (Transcript.meetingId is @unique) so a retried AI job never crashes

@@ -27,7 +27,13 @@ export const extractAudio = async (
     inputPath: string,
     options: ExtractAudioOptions = {},
 ): Promise<string> => {
-    const outputPath = inputPath.replace(/\.[^.]+$/, '.wav');
+    // A WAV source would otherwise map to its own path, and ffmpeg refuses to
+    // edit a file in place. Always write a distinct 16 kHz mono WAV artifact.
+    const parsed = path.parse(inputPath);
+    let outputPath = path.join(parsed.dir, `${parsed.name}.wav`);
+    if (outputPath === inputPath) {
+        outputPath = path.join(parsed.dir, `${parsed.name}.extracted.wav`);
+    }
 
     // -threads 2 caps decoder threads so a burst of extraction jobs can never
     // saturate the whole box and starve the AI queue (architecture decision D4/D8).

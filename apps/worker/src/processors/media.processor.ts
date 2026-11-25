@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import { Job } from 'bullmq';
 import { JOB_NAMES, type AIProcessingJob, type MediaExtractionJob } from '@repo/queue';
 import { logger } from '@repo/logger';
@@ -7,6 +9,11 @@ import { env } from '../config/app.config.js';
 import { getStorageClient } from '../config/storage.config.js';
 import { getAIProcessingQueue } from '../config/queue.config.js';
 import { getRecordingById, updateRecording } from '../services/recording.service.js';
+import {
+    finishMediaExtraction,
+    markFailed,
+    startMediaExtraction,
+} from '../services/meeting-status.service.js';
 import { downloadToTemp } from '../services/storage.service.js';
 import { cleanupTempFiles, getMediaMetadata } from '../services/media.service.js';
 import {
@@ -34,6 +41,8 @@ export const processMediaExtractionJob = async (job: Job<MediaExtractionJob>) =>
     let wavPath = '';
 
     try {
+        await startMediaExtraction(recording.id, recording.meetingId);
+
         localPath = await downloadToTemp(recording.id, recording.fileName, recording.fileKey);
 
         const metadata = await getMediaMetadata(localPath);
@@ -64,14 +73,22 @@ export const processMediaExtractionJob = async (job: Job<MediaExtractionJob>) =>
         // the job retries and can still re-extract from the video. jobId dedupes —
         // a retry never enqueues a second AI job.
         const aiQueue = getAIProcessingQueue();
-        const existing = await aiQueue.getJob(recording.id);
-        if (!existing) {
+
+        // A failed AI job is retained for inspection; it must never block a new
+        // attempt. Every enqueue gets its own job ID, so retries are independent.
+        const queued = await aiQueue.getJobs(['waiting', 'active', 'delayed', 'completed']);
+        const alreadyQueued = queued.some((job) => job.data.recordingId === recording.id);
+
+        if (!alreadyQueued) {
+            const attemptId = randomUUID();
             await aiQueue.add(
                 JOB_NAMES.PROCESS_AI,
-                { recordingId: recording.id } satisfies AIProcessingJob,
-                { jobId: recording.id },
+                { recordingId: recording.id, attemptId } satisfies AIProcessingJob,
+                { jobId: `${recording.id}-${attemptId}` },
             );
         }
+
+        await finishMediaExtraction(recording.id, recording.meetingId);
 
         // The video is transient (D2): delete the source now that the WAV is safely
         // stored and the AI job is queued. Best-effort — cleanup failure must never
@@ -94,6 +111,9 @@ export const processMediaExtractionJob = async (job: Job<MediaExtractionJob>) =>
                 'Failed to delete source recording',
             );
         }
+    } catch (error) {
+        await markFailed(recording.id, recording.meetingId, error);
+        throw error;
     } finally {
         // Cleanup temp files
         await cleanupTempFiles(localPath, wavPath);

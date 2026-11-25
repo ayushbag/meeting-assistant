@@ -1,5 +1,7 @@
 import { logger } from '@repo/logger';
-import { classifyMeeting } from './classifier.js';
+import { env } from '../../config/app.config.js';
+import { isUsableTranscript } from '../transcription.service.js';
+import { classifyMeeting, type MeetingClassification } from './classifier.js';
 import { verifyEvidence } from './evidence.js';
 import { extractIntelligence } from './extractor.js';
 import { mergeIntelligence } from './merger.js';
@@ -10,10 +12,48 @@ import { createIntelligenceStatus, failIntelligence, updateIntelligenceStatus } 
 import { buildRagDocuments } from '../rag/document-builder.js';
 import { chunkTranscript } from '../rag/chunker.js';
 import { indexDocuments } from '../rag/indexer.js';
+import type { CommonIntelligence } from './schemas/common.js';
+
+const EMPTY_GENERIC_CLASSIFICATION: MeetingClassification = {
+    meetingType: 'other',
+    confidence: 0,
+    goal: 'No spoken content detected',
+    language: 'en',
+};
+
+const EMPTY_GENERIC_INTELLIGENCE: CommonIntelligence = {
+    keyTopics: [],
+    participants: [],
+    importantMoments: [],
+    openQuestions: [],
+    outcomes: [],
+    actionItems: [],
+};
 
 export const runIntelligencePipeline = async (transcript: string, meetingId: string) => {
     try {
         await createIntelligenceStatus(meetingId);
+
+        if (!isUsableTranscript(transcript)) {
+            const length = transcript.trim().length;
+            const reason = `Transcript length ${length} is below minimum ${env.MIN_TRANSCRIPT_CHARS}`;
+
+            logger.info({ meetingId, length, reason }, 'Skipping intelligence extraction for empty/short transcript');
+
+            await persistIntelligence({
+                meetingId,
+                classification: EMPTY_GENERIC_CLASSIFICATION,
+                intelligence: EMPTY_GENERIC_INTELLIGENCE,
+                segmentCount: 0,
+            });
+
+            return {
+                classification: EMPTY_GENERIC_CLASSIFICATION,
+                intelligence: EMPTY_GENERIC_INTELLIGENCE,
+                skipped: true,
+                reason,
+            };
+        }
 
         // classify the meeting
         await updateIntelligenceStatus(meetingId, 'CLASSIFYING');
