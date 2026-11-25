@@ -12,20 +12,14 @@ const normalizeText = (text: string): string => {
 const findSourceSegment = (
     quote: string,
     segments: TranscriptSegment[],
-): number => {
+): number | null => {
     const normalizedQuote = normalizeText(quote);
 
-    const matchingSegment = segments.find((segment) =>
-        normalizeText(segment.text).includes(normalizedQuote),
+    return (
+        segments.find((segment) =>
+            normalizeText(segment.text).includes(normalizedQuote),
+        )?.index ?? null
     );
-
-    if (!matchingSegment) {
-        throw new Error(
-            `Evidence quote not found in transcript: "${quote}"`,
-        );
-    }
-
-    return matchingSegment.index;
 };
 
 const verifyEvidenceRecursive = (
@@ -53,10 +47,15 @@ const verifyEvidenceRecursive = (
         const evidence = object.evidence as Record<string, unknown>;
 
         if (typeof evidence.quote === 'string') {
-            evidence.sourceSegment = findSourceSegment(
-                evidence.quote,
-                segments,
-            );
+            const sourceSegment = findSourceSegment(evidence.quote, segments);
+
+            if (sourceSegment === null) {
+                evidence.verified = false;
+                delete evidence.sourceSegment;
+            } else {
+                evidence.sourceSegment = sourceSegment;
+                evidence.verified = true;
+            }
         }
     }
 
@@ -65,10 +64,10 @@ const verifyEvidenceRecursive = (
     }
 };
 
-export const verifyEvidence = (
-    intelligence: CommonIntelligence,
+export const verifyEvidence = <T extends CommonIntelligence>(
+    intelligence: T,
     segments: TranscriptSegment[],
-): CommonIntelligence => {
+): T => {
     verifyEvidenceRecursive(intelligence, segments);
 
     return intelligence;

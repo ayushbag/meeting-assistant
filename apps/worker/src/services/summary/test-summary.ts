@@ -1,5 +1,4 @@
-import { persistSummary } from './persist.js';
-import { generateMeetingSummary } from './summarizer.js';
+import { runSummaryPipeline } from './pipeline.js';
 
 const transcript = `
 Speaker 1: Are you coming to Pune on Saturday?
@@ -11,11 +10,9 @@ Speaker 2: Yeah, one works for me.
 Speaker 1: I'll message you the location on Saturday.
 `;
 
-const summary = await generateMeetingSummary(transcript);
+const summary = await runSummaryPipeline(transcript, 'cmtllxd610002tstu70kx3uz3');
 
 console.log('\n===== SUMMARY =====\n');
 console.log(summary);
-
-await persistSummary('cmtflfv77000178tubw77m0in', summary);
 
 console.log('\nAdded summary to DB ✅\n');

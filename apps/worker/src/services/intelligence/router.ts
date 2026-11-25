@@ -1,21 +1,28 @@
 import { logger } from '@repo/logger';
 
 import type { MeetingClassification } from './classifier.js';
-import { businessPrompt } from './prompts/business/v1.js';
-import { genericPrompt } from './prompts/generic/v1.js';
+import { businessPrompt, businessPromptVersion } from './prompts/business/v1.js';
+import { genericPrompt, genericPromptVersion } from './prompts/generic/v1.js';
+import type { BusinessIntelligence } from './schemas/business.js';
+import type { CommonIntelligence } from './schemas/common.js';
 import { businessIntelligenceSchema } from './schemas/business.js';
 import { genericIntelligenceSchema } from './schemas/generic.js';
 
 const BUSINESS_CONFIDENCE_THRESHOLD = 0.6;
 
+export type IntelligenceResult = CommonIntelligence &
+    Partial<Pick<BusinessIntelligence, 'decisions' | 'discussionPoints' | 'risks'>>;
+
 export type IntelligencePipeline = {
     meetingType: 'business' | 'other';
 
-    schema: 
+    schema:
         | typeof genericIntelligenceSchema
         | typeof businessIntelligenceSchema;
 
     prompt: (transcript: string) => string;
+
+    promptVersion: string;
 };
 
 const genericPipeline = (
@@ -35,6 +42,7 @@ const genericPipeline = (
         meetingType: 'other',
         schema: genericIntelligenceSchema,
         prompt: genericPrompt,
+        promptVersion: genericPromptVersion,
     };
 };
 
@@ -45,6 +53,7 @@ export const routeMeeting = (classification: MeetingClassification): Intelligenc
                 meetingType: 'business',
                 schema: businessIntelligenceSchema,
                 prompt: businessPrompt,
+                promptVersion: businessPromptVersion,
             };
         }
 

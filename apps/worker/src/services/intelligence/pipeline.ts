@@ -5,13 +5,11 @@ import { classifyMeeting, type MeetingClassification } from './classifier.js';
 import { verifyEvidence } from './evidence.js';
 import { extractIntelligence } from './extractor.js';
 import { mergeIntelligence } from './merger.js';
+import { genericPromptVersion } from './prompts/generic/v1.js';
 import { persistIntelligence } from './persist.js';
 import { routeMeeting } from './router.js';
 import { segmentTranscript } from './segmenter.js';
 import { createIntelligenceStatus, failIntelligence, updateIntelligenceStatus } from './status.js';
-import { buildRagDocuments } from '../rag/document-builder.js';
-import { chunkTranscript } from '../rag/chunker.js';
-import { indexDocuments } from '../rag/indexer.js';
 import type { CommonIntelligence } from './schemas/common.js';
 
 const EMPTY_GENERIC_CLASSIFICATION: MeetingClassification = {
@@ -46,6 +44,8 @@ export const runIntelligencePipeline = async (transcript: string, meetingId: str
                 resolvedMeetingType: 'other',
                 intelligence: EMPTY_GENERIC_INTELLIGENCE,
                 segmentCount: 0,
+                promptVersion: genericPromptVersion,
+                model: env.GEMINI_MODEL,
             });
 
             return {
@@ -87,10 +87,11 @@ export const runIntelligencePipeline = async (transcript: string, meetingId: str
 
         for (const segment of segments) {
             const result = await extractIntelligence(segment.text, pipeline);
+            const verifiedResult = verifyEvidence(result, [segment]);
 
             results.push({
                 segmentIndex: segment.index,
-                intelligence: result,
+                intelligence: verifiedResult,
             });
         }
 
@@ -104,7 +105,7 @@ export const runIntelligencePipeline = async (transcript: string, meetingId: str
         logger.info({ meetingId }, 'Intelligence merged');
 
         // Verify evidence
-        verifyEvidence(intelligence, segments);
+        const verifiedIntelligence = verifyEvidence(intelligence, segments);
 
         logger.info({ meetingId }, 'Evidence verified');
 
@@ -113,36 +114,17 @@ export const runIntelligencePipeline = async (transcript: string, meetingId: str
             meetingId,
             classification,
             resolvedMeetingType: pipeline.meetingType,
-            intelligence,
+            intelligence: verifiedIntelligence,
             segmentCount: segments.length,
+            promptVersion: pipeline.promptVersion,
+            model: env.GEMINI_MODEL,
         });
 
         logger.info({ meetingId }, 'Intelligence persisted');
 
-        const ragDocuments = buildRagDocuments(meetingId, {
-            classification,
-            intelligence,
-        });
-
-        const transcriptChunks = chunkTranscript(meetingId, transcript);
-
-        await indexDocuments([
-            ...ragDocuments,
-            ...transcriptChunks,
-        ]);
-
-        logger.info(
-            {
-                meetingId,
-                intelligenceDocuments: ragDocuments.length,
-                transcriptChunks: transcriptChunks.length,
-            },
-            'Meeting indexed for RAG',
-        );
-
         return {
             classification,
-            intelligence,
+            intelligence: verifiedIntelligence,
         };
     } catch (error) {
         await failIntelligence(meetingId, error);

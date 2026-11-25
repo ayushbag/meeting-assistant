@@ -19,12 +19,13 @@ import {
     transcribeAudio,
 } from '../services/transcription.service.js';
 import { runIntelligencePipeline } from '../services/intelligence/pipeline.js';
+import { runSummaryPipeline } from '../services/summary/pipeline.js';
 
 /**
  * AI-processing job (high concurrency — this step is network-bound):
  *
  * download extracted WAV → Gemini transcription → persist transcript →
- * analyze meeting intelligence → persist intelligence.
+ * generate summary and analyze meeting intelligence in parallel.
  *
  * Runs on the same box as the media worker but on its own queue, so ffmpeg
  * bursts can never starve it (learning/architecture-decisions.md §6/§7).
@@ -90,13 +91,15 @@ export const processAIJob = async (job: Job<AIProcessingJob>) => {
                 );
             }
 
-            // Summary generation is reserved for the next stage; the recording is
-            // already at the boundary where that stage will pick up.
+            // Transcript is durable; summary and intelligence can now run in parallel.
             await markSummarizing(recording.id, recording.meetingId);
         }
 
-        // Analyze transcript and persist meeting intelligence
-        await runIntelligencePipeline(transcript, recording.meetingId);
+        // Generate the Markdown summary and persist meeting intelligence.
+        await Promise.all([
+            runSummaryPipeline(transcript, recording.meetingId),
+            runIntelligencePipeline(transcript, recording.meetingId),
+        ]);
 
         await markCompleted(recording.id, recording.meetingId);
     } catch (error) {

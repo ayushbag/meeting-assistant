@@ -1,10 +1,13 @@
 import { ai } from '../../config/ai.config.js';
-import { IntelligencePipeline } from './router.js';
+import type { IntelligencePipeline, IntelligenceResult } from './router.js';
 import { validateIntelligence } from './validation.js';
 
 const MAX_RETRIES = 1;
 
-export const extractIntelligence = async (transcript: string, pipeline: IntelligencePipeline) => {
+export const extractIntelligence = async (
+    transcript: string,
+    pipeline: IntelligencePipeline,
+): Promise<IntelligenceResult> => {
     const basePrompt = pipeline.prompt(transcript);
 
     let prompt = basePrompt;

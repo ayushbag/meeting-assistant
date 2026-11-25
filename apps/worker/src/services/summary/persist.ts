@@ -1,6 +1,15 @@
 import { prisma } from '@repo/db';
 
-export const persistSummary = async (meetingId: string, markdown: string) => {
+type PersistSummaryOptions = {
+    promptVersion?: string;
+    model?: string;
+};
+
+export const persistSummary = async (
+    meetingId: string,
+    markdown: string,
+    options: PersistSummaryOptions = {},
+) => {
     return prisma.summary.upsert({
         where: {
             meetingId,
@@ -9,10 +18,14 @@ export const persistSummary = async (meetingId: string, markdown: string) => {
         create: {
             meetingId,
             markdown,
+            promptVersion: options.promptVersion,
+            model: options.model,
         },
 
         update: {
             markdown,
+            promptVersion: options.promptVersion,
+            model: options.model,
         },
     });
 };

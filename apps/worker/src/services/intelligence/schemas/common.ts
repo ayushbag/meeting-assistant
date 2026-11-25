@@ -1,8 +1,9 @@
 import { z } from "zod";
 
 export const evidenceSchema = z.object({
-    sourceSegment: z.number().int().nonnegative(),
+    sourceSegment: z.number().int().nonnegative().optional(),
     quote: z.string().min(1),
+    verified: z.boolean().optional(),
 });
 
 export const participantSchema = z.object({

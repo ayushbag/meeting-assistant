@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto';
 
-import { prisma } from '@repo/db';
+import { prisma, type MeetingIntelligence } from '@repo/db';
 import { logger } from '@repo/logger';
+import { chunkTranscript, qdrantClient, qdrantConfig } from '@repo/rag';
 import {
     AI_STAGES,
     createMediaExtractionQueue,
@@ -17,15 +18,18 @@ import { getAIProcessingQueue } from '../config/queue.config.js';
 import { getRedisConnection } from '../config/redis.config.js';
 import { getStorageClient } from '../config/storage.config.js';
 import { markCompleted, markFailed, markSummarizing } from './meeting-status.service.js';
-import { persistSummary } from './summary/persist.js';
-import { generateMeetingSummary } from './summary/summarizer.js';
+import {
+    buildRagDocuments,
+    type MeetingIntelligencePayload,
+} from './rag/document-builder.js';
+import { runSummaryPipeline } from './summary/pipeline.js';
 
 export const RETRY_ACTIONS = {
     REUPLOAD_REQUIRED: 'REUPLOAD_REQUIRED',
     EXTRACT_AUDIO: JOB_NAMES.EXTRACT_AUDIO,
     PROCESS_AI: JOB_NAMES.PROCESS_AI,
     REGENERATE_SUMMARY: 'REGENERATE_SUMMARY',
-    REINDEX: 'REINDEX',
+    INDEX_REQUIRED: 'INDEX_REQUIRED',
     NO_ACTION: 'NO_ACTION',
 } as const;
 
@@ -49,6 +53,56 @@ const objectExists = async (fileKey?: string | null): Promise<boolean> => {
     });
 
     return result.exists;
+};
+
+type IndexCheck =
+    | { current: true; expected: number; found: number }
+    | { current: false; reason: string };
+
+const checkIndex = async (
+    meetingId: string,
+    transcript: string,
+    intelligence: MeetingIntelligence,
+): Promise<IndexCheck> => {
+    const expected =
+        buildRagDocuments(meetingId, {
+            classification: { goal: intelligence.goal ?? undefined },
+            intelligence:
+                intelligence.payload as MeetingIntelligencePayload['intelligence'],
+        }).length + chunkTranscript(meetingId, transcript).length;
+
+    try {
+        const result = await qdrantClient.count(qdrantConfig.collection, {
+            filter: {
+                must: [
+                    {
+                        key: 'meetingId',
+                        match: { value: meetingId },
+                    },
+                ],
+            },
+            exact: true,
+        });
+
+        if (result.count === expected) {
+            return { current: true, expected, found: result.count };
+        }
+
+        return {
+            current: false,
+            reason: `RAG index is stale; expected ${expected} points but found ${result.count}.`,
+        };
+    } catch (error) {
+        logger.warn(
+            { err: error, meetingId },
+            'Could not inspect the RAG index',
+        );
+
+        return {
+            current: false,
+            reason: 'RAG index is unavailable and must be rebuilt.',
+        };
+    }
 };
 
 /**
@@ -131,12 +185,24 @@ export const decideRetry = async (meetingId: string): Promise<RetryDecision> => 
         };
     }
 
-    // RAG staleness needs an index-side check and is handled by the RAG retry
-    // stage. At this point every local artifact is present.
+    const indexCheck = await checkIndex(
+        meetingId,
+        transcript,
+        intelligence!,
+    );
+
+    if (!indexCheck.current) {
+        return {
+            action: RETRY_ACTIONS.INDEX_REQUIRED,
+            recordingId: recording.id,
+            reason: indexCheck.reason,
+        };
+    }
+
     return {
         action: RETRY_ACTIONS.NO_ACTION,
         recordingId: recording.id,
-        reason: 'All processing artifacts are present.',
+        reason: 'All processing artifacts are present and indexed.',
     };
 };
 
@@ -191,8 +257,7 @@ const regenerateSummary = async (meetingId: string, recordingId: string) => {
             throw new Error('Stored transcript is missing or empty; cannot regenerate summary.');
         }
 
-        const markdown = await generateMeetingSummary(transcript.content);
-        await persistSummary(meetingId, markdown);
+        await runSummaryPipeline(transcript.content, meetingId);
         await markCompleted(recordingId, meetingId);
 
         logger.info({ meetingId }, 'Summary regenerated from stored transcript');
@@ -227,6 +292,9 @@ export const retryMeetingProcessing = async (meetingId: string): Promise<RetryDe
         }
         case RETRY_ACTIONS.REGENERATE_SUMMARY: {
             await regenerateSummary(meetingId, decision.recordingId!);
+            return decision;
+        }
+        case RETRY_ACTIONS.INDEX_REQUIRED: {
             return decision;
         }
         case RETRY_ACTIONS.NO_ACTION: {

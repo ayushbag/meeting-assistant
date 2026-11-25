@@ -35,13 +35,13 @@ export const startAIProcessing = async (recordingId: string, meetingId: string) 
     await updateRecordingStatus(recordingId, RecordingStatus.TRANSCRIBING);
 };
 
-/** Transcript persisted; summary generation is reserved for the next stage. */
+/** Transcript persisted; summary and intelligence generation can now run. */
 export const markSummarizing = async (recordingId: string, meetingId: string) => {
     await setMeetingStatus(meetingId, MeetingStatus.PROCESSING);
     await updateRecordingStatus(recordingId, RecordingStatus.SUMMARIZING);
 };
 
-/** Intelligence, indexing, and downstream artifacts are complete. */
+/** Intelligence and local artifacts are complete; indexing is tracked separately. */
 export const markCompleted = async (recordingId: string, meetingId: string) => {
     await setMeetingStatus(meetingId, MeetingStatus.COMPLETED);
     await updateRecordingStatus(recordingId, RecordingStatus.COMPLETED);

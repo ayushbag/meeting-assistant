@@ -152,6 +152,9 @@ model Summary {
 
   markdown String @db.Text
 
+  promptVersion String?
+  model         String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
