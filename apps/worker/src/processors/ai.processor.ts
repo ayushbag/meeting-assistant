@@ -9,7 +9,7 @@ import { createTranscript, transcribeAudio } from '../services/transcription.ser
 import { runIntelligencePipeline } from '../services/intelligence/pipeline.js';
 
 /**
- * Phase 1 AI-processing job (high concurrency — this step is network-bound):
+ * AI-processing job (high concurrency — this step is network-bound):
  *
  * download extracted WAV → Gemini transcription → persist transcript →
  * analyze meeting intelligence → persist intelligence.

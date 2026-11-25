@@ -7,17 +7,47 @@ import {
     updateMeetingSchema,
 } from '../validation/meeting.validation.js';
 import { prisma, RecordingStatus } from '@repo/db';
-import { InternalServerError, NotFoundException } from '../utils/app-error.js';
+import { BadRequestException, InternalServerError, NotFoundException } from '../utils/app-error.js';
 import {
     completeMultipartUpload,
     createMultipartUpload,
     getMultipartUploadPartUrl,
     headRecording,
+    isValidFileExtension,
+    isValidMimeType,
 } from '@repo/storage';
 import { getStorageClient } from '../config/storage.config.js';
 import { env } from '../config/app.config.js';
 import { getMediaExtractionQueue } from '../config/queue.config.js';
 import { JOB_NAMES } from '@repo/queue';
+
+/**
+ * Resolves an upload file key only when it belongs to the caller and to the
+ * meeting in the URL. Prevents signing or completing another user's upload.
+ */
+const findOwnedRecordingForUpload = async (
+    fileKey: string,
+    meetingId: string,
+    userId: string,
+) => {
+    const recording = await prisma.recording.findFirst({
+        where: {
+            fileKey,
+            meeting: { createdById: userId },
+        },
+        select: {
+            id: true,
+            meetingId: true,
+            fileKey: true,
+        },
+    });
+
+    if (!recording || recording.meetingId !== meetingId) {
+        throw new NotFoundException('Recording not found');
+    }
+
+    return recording;
+};
 
 export const createMeetingService = async (
     body: z.infer<typeof createMeetingSchema>,
@@ -55,10 +85,11 @@ export const getMeetingsService = async (userId: string) => {
     return meetings;
 };
 
-export const getMeetingService = async (meetingId: string) => {
-    const meeting = await prisma.meeting.findUnique({
+export const getMeetingService = async (meetingId: string, userId: string) => {
+    const meeting = await prisma.meeting.findFirst({
         where: {
             id: meetingId,
+            createdById: userId,
         },
     });
 
@@ -72,7 +103,22 @@ export const getMeetingService = async (meetingId: string) => {
 export const updateMeetingService = async (
     body: z.infer<typeof updateMeetingSchema>,
     meetingId: string,
+    userId: string,
 ) => {
+    const existingMeeting = await prisma.meeting.findFirst({
+        where: {
+            id: meetingId,
+            createdById: userId,
+        },
+        select: {
+            id: true,
+        },
+    });
+
+    if (!existingMeeting) {
+        throw new NotFoundException('Meeting not found');
+    }
+
     const meeting = await prisma.meeting.update({
         where: {
             id: meetingId,
@@ -86,11 +132,25 @@ export const updateMeetingService = async (
     return meeting;
 };
 
-export const deleteMeetingService = async (meetingId: string) => {
+export const deleteMeetingService = async (meetingId: string, userId: string) => {
+    const existingMeeting = await prisma.meeting.findFirst({
+        where: {
+            id: meetingId,
+            createdById: userId,
+        },
+        select: {
+            id: true,
+        },
+    });
+
+    if (!existingMeeting) {
+        throw new NotFoundException('Meeting not found');
+    }
+
     try {
         const meeting = await prisma.meeting.delete({
             where: {
-                id: meetingId,
+                id: existingMeeting.id,
             },
             select: {
                 id: true,
@@ -100,7 +160,7 @@ export const deleteMeetingService = async (meetingId: string) => {
 
         return meeting;
     } catch (error) {
-        // Prisma P2025: Record not found
+        // Prisma P2025: Record not found (e.g. deleted between check and delete)
         if (
             error &&
             typeof error === 'object' &&
@@ -127,6 +187,12 @@ export const initiateMultipartUploadService = async (
 
     if (!meeting) {
         throw new NotFoundException('Meeting not found');
+    }
+
+    if (!isValidMimeType(body.mimeType) || !isValidFileExtension(body.fileName)) {
+        throw new BadRequestException(
+            'Unsupported file type. Only audio/video recordings are allowed.',
+        );
     }
 
     const upload = await createMultipartUpload({
@@ -174,21 +240,16 @@ export const getMultipartUploadPartUrlService = async (
     meetingId: string,
     userId: string,
 ) => {
-    const meeting = await prisma.meeting.findFirst({
-        where: {
-            id: meetingId,
-            createdById: userId,
-        },
-    });
-
-    if (!meeting) {
-        throw new NotFoundException('Meeting not found');
-    }
+    const recording = await findOwnedRecordingForUpload(
+        body.fileKey,
+        meetingId,
+        userId,
+    );
 
     const url = await getMultipartUploadPartUrl({
         client: getStorageClient(),
         bucket: env.S3_BUCKET_NAME ?? 'meetings',
-        fileKey: body.fileKey,
+        fileKey: recording.fileKey,
         uploadId: body.uploadId,
         partNumber: body.partNumber,
     });
@@ -201,16 +262,11 @@ export const completeMultipartUploadService = async (
     meetingId: string,
     userId: string,
 ) => {
-    const meeting = await prisma.meeting.findFirst({
-        where: {
-            id: meetingId,
-            createdById: userId,
-        },
-    });
-
-    if (!meeting) {
-        throw new NotFoundException('Meeting not found');
-    }
+    const ownedRecording = await findOwnedRecordingForUpload(
+        body.fileKey,
+        meetingId,
+        userId,
+    );
 
     // Completing is idempotent: if the client retries a complete that already
     // succeeded, MinIO rejects it with NoSuchUpload because the multipart
@@ -220,7 +276,7 @@ export const completeMultipartUploadService = async (
         await completeMultipartUpload({
             client: getStorageClient(),
             bucket: env.S3_BUCKET_NAME,
-            fileKey: body.fileKey,
+            fileKey: ownedRecording.fileKey,
             uploadId: body.uploadId,
             parts: body.parts,
         });
@@ -228,7 +284,7 @@ export const completeMultipartUploadService = async (
         const check = await headRecording({
             client: getStorageClient(),
             bucket: env.S3_BUCKET_NAME,
-            fileKey: body.fileKey,
+            fileKey: ownedRecording.fileKey,
         });
 
         if (!check.exists) {
@@ -239,7 +295,7 @@ export const completeMultipartUploadService = async (
     const head = await headRecording({
         client: getStorageClient(),
         bucket: env.S3_BUCKET_NAME,
-        fileKey: body.fileKey,
+        fileKey: ownedRecording.fileKey,
     });
 
     if (!head.exists) {
@@ -250,9 +306,21 @@ export const completeMultipartUploadService = async (
         throw new InternalServerError('Recording metadata is incomplete');
     }
 
+    if (!isValidMimeType(head.mimeType)) {
+        throw new BadRequestException(
+            'Unsupported object MIME type. Only audio/video recordings are allowed.',
+        );
+    }
+
+    if (head.size > env.MAX_UPLOAD_BYTES) {
+        throw new BadRequestException(
+            `Recording exceeds the maximum upload size of ${env.MAX_UPLOAD_BYTES} bytes.`,
+        );
+    }
+
     const recording = await prisma.recording.update({
         where: {
-            fileKey: body.fileKey,
+            id: ownedRecording.id,
         },
         data: {
             mimeType: head.mimeType,
@@ -278,4 +346,38 @@ export const completeMultipartUploadService = async (
     });
 
     return recording;
+};
+
+export const getMeetingStatusService = async (meetingId: string, userId: string) => {
+    const meeting = await prisma.meeting.findFirst({
+        where: {
+            id: meetingId,
+            createdById: userId,
+        },
+        select: {
+            status: true,
+            recording: {
+                select: {
+                    status: true,
+                },
+            },
+            intelligence: {
+                select: {
+                    status: true,
+                    error: true,
+                },
+            },
+        },
+    });
+
+    if (!meeting) {
+        throw new NotFoundException('Meeting not found');
+    }
+
+    return {
+        meetingStatus: meeting.status,
+        recordingStatus: meeting.recording?.status ?? null,
+        intelligenceStatus: meeting.intelligence?.status ?? null,
+        error: meeting.intelligence?.error ?? null,
+    }
 };

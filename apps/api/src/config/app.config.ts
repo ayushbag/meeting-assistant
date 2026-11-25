@@ -34,6 +34,9 @@ const envSchema = z.object({
     S3_SECRET_KEY: z.string(),
     S3_BUCKET_NAME: z.string(),
     S3_FORCE_PATH_STYLE: z.string().default('true'),
+
+    // Uploads are capped after completion using authoritative object metadata.
+    MAX_UPLOAD_BYTES: z.coerce.number().int().positive().default(500 * 1024 * 1024),
 });
 
 export const env = envSchema.parse(process.env);

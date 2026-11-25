@@ -19,8 +19,8 @@ const registerWorkerEvents = (worker: Worker, label: string) => {
         logger.error({
             jobId: job?.id,
             queue: job?.queueName,
-            error: err,
-        });
+            err,
+        }, 'Worker job failed');
     });
 };
 

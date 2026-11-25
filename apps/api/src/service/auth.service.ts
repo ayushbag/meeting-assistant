@@ -88,8 +88,15 @@ export const loginUserService = async (body: z.infer<typeof loginSchema>) => {
         );
     }
 
-    // 2. Verify password
-    const isPasswordValid = await comparePassword(password, user.password!);
+    // 2. Verify password. Google-only accounts have no local password.
+    if (!user.password) {
+        throw new UnauthorizedException(
+            'This account uses Google Sign-In. Please sign in with Google.',
+            ErrorCodeEnum.AUTH_UNAUTHORIZED_ACCESS,
+        );
+    }
+
+    const isPasswordValid = await comparePassword(password, user.password);
     if (!isPasswordValid) {
         throw new UnauthorizedException(
             'Invalid email or password.',

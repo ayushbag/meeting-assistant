@@ -7,11 +7,14 @@ import { persistIntelligence } from './persist.js';
 import { routeMeeting } from './router.js';
 import { segmentTranscript } from './segmenter.js';
 import { createIntelligenceStatus, failIntelligence, updateIntelligenceStatus } from './status.js';
+import { buildRagDocuments } from '../rag/document-builder.js';
+import { chunkTranscript } from '../rag/chunker.js';
+import { indexDocuments } from '../rag/indexer.js';
 
 export const runIntelligencePipeline = async (transcript: string, meetingId: string) => {
-    await createIntelligenceStatus(meetingId);
-
     try {
+        await createIntelligenceStatus(meetingId);
+
         // classify the meeting
         await updateIntelligenceStatus(meetingId, 'CLASSIFYING');
 
@@ -69,6 +72,27 @@ export const runIntelligencePipeline = async (transcript: string, meetingId: str
         });
 
         logger.info({ meetingId }, 'Intelligence persisted');
+
+        const ragDocuments = buildRagDocuments(meetingId, {
+            classification,
+            intelligence,
+        });
+
+        const transcriptChunks = chunkTranscript(meetingId, transcript);
+
+        await indexDocuments([
+            ...ragDocuments,
+            ...transcriptChunks,
+        ]);
+
+        logger.info(
+            {
+                meetingId,
+                intelligenceDocuments: ragDocuments.length,
+                transcriptChunks: transcriptChunks.length,
+            },
+            'Meeting indexed for RAG',
+        );
 
         return {
             classification,

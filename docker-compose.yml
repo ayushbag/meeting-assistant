@@ -44,7 +44,20 @@ services:
         volumes:
             - minio-data:/data
 
+    qdrant:
+        image: qdrant/qdrant:latest
+        container_name: meetinglens-qdrant
+        restart: unless-stopped
+
+        ports:
+            - '6333:6333'
+            - '6334:6334'
+
+        volumes:
+            - qdrant-data:/qdrant/storage
+
 volumes:
     postgres-data:
     redis-data:
     minio-data:
+    qdrant-data:

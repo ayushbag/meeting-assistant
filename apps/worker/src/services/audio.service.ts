@@ -30,7 +30,7 @@ export const extractAudio = async (
     const outputPath = inputPath.replace(/\.[^.]+$/, '.wav');
 
     // -threads 2 caps decoder threads so a burst of extraction jobs can never
-    // saturate the whole box and starve the AI queue (Phase 1 decision D4/D8).
+    // saturate the whole box and starve the AI queue (architecture decision D4/D8).
     const args = ['-y', '-threads', '2', '-i', inputPath, '-vn'];
 
     if (options.streamCopy) {

@@ -5,6 +5,7 @@ import {
     deleteMeetingController,
     getMeetingController,
     getMeetingsController,
+    getMeetingStatusController,
     getMultipartUploadPartUrlController,
     initiateMultipartUploadController,
     updateMeetingController,
@@ -21,3 +22,5 @@ meetingRoutes.delete('/:meetingId', deleteMeetingController);
 meetingRoutes.post('/:meetingId/uploads/initiate', initiateMultipartUploadController);
 meetingRoutes.post('/:meetingId/uploads/part-url', getMultipartUploadPartUrlController);
 meetingRoutes.post('/:meetingId/uploads/complete', completeMultipartUploadController);
+
+meetingRoutes.get('/:meetingId/status', getMeetingStatusController);

@@ -45,7 +45,7 @@ Speaker 2: We should also discuss the launch budget. The current marketing estim
 
 Speaker 1: Let's keep the budget at ₹3 lakh for now and review the results after the first two weeks.
 
-Speaker 3: One concern is that we don't have enough production data for the initial testing phase.
+Speaker 3: One concern is that we don't have enough production data for the initial testing stage.
 
 Speaker 2: We can use anonymized historical data until we have enough live data.
 

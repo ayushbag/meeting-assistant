@@ -14,6 +14,7 @@ import {
     deleteMeetingService,
     getMeetingService,
     getMeetingsService,
+    getMeetingStatusService,
     getMultipartUploadPartUrlService,
     initiateMultipartUploadService,
     updateMeetingService,
@@ -44,8 +45,9 @@ export const getMeetingsController = asyncHandler(async (req: Request, res: Resp
 
 export const getMeetingController = asyncHandler(async (req: Request, res: Response) => {
     const meetingId = req.params.meetingId as string;
+    const userId = req.user!.userId;
 
-    const meeting = await getMeetingService(meetingId);
+    const meeting = await getMeetingService(meetingId, userId);
 
     return res.status(HTTPSTATUS.OK).json({
         message: 'Meeting fetched successfully',
@@ -56,8 +58,9 @@ export const getMeetingController = asyncHandler(async (req: Request, res: Respo
 export const updateMeetingController = asyncHandler(async (req: Request, res: Response) => {
     const body = updateMeetingSchema.parse(req.body);
     const meetingId = req.params.meetingId as string;
+    const userId = req.user!.userId;
 
-    const meeting = await updateMeetingService(body, meetingId);
+    const meeting = await updateMeetingService(body, meetingId, userId);
 
     return res.status(HTTPSTATUS.OK).json({
         message: 'Updated meeting successfully',
@@ -67,8 +70,9 @@ export const updateMeetingController = asyncHandler(async (req: Request, res: Re
 
 export const deleteMeetingController = asyncHandler(async (req: Request, res: Response) => {
     const meetingId = req.params.meetingId as string;
+    const userId = req.user!.userId;
 
-    await deleteMeetingService(meetingId);
+    await deleteMeetingService(meetingId, userId);
 
     return res.status(HTTPSTATUS.OK).json({
         message: 'Deleted meeting successfully',
@@ -139,3 +143,17 @@ export const completeMultipartUploadController = asyncHandler(
         });
     },
 );
+
+export const getMeetingStatusController = asyncHandler(
+    async (req: Request, res: Response) => {
+        const meetingId = req.params.meetingId as string;
+        const userId = req.user!.userId;
+
+        const status = await getMeetingStatusService(meetingId, userId);
+
+        return res.status(HTTPSTATUS.OK).json({
+            message: 'Meeting status fetched successfully',
+            status,
+        })
+    }
+)

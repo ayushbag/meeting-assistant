@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isValidFileExtension, isValidMimeType } from '@repo/storage';
 
 export const createMeetingSchema = z.object({
     title: z
@@ -34,9 +35,22 @@ export const updateMeetingSchema = z
     });
 
 export const initiateMultipartUploadSchema = z.object({
-    fileName: z.string().trim().min(1, 'File name is required').max(255),
+    fileName: z
+        .string()
+        .trim()
+        .min(1, 'File name is required')
+        .max(255)
+        .refine(isValidFileExtension, {
+            message: 'Unsupported file extension. Only audio/video files are allowed.',
+        }),
 
-    mimeType: z.string().trim().min(1, 'MIME type is required'),
+    mimeType: z
+        .string()
+        .trim()
+        .min(1, 'MIME type is required')
+        .refine(isValidMimeType, {
+            message: 'Unsupported MIME type. Only audio/video files are allowed.',
+        }),
 });
 
 export const multipartUploadPartSchema = z.object({

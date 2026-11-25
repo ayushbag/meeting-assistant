@@ -8,13 +8,23 @@ type IntelligenceStatus =
     | 'READY'
     | 'FAILED';
 
+/**
+ * Reset the intelligence status for a run. Upsert makes retries safe: a job
+ * that failed previously can create a fresh PENDING row instead of crashing
+ * on the unique meetingId constraint.
+ */
 export const createIntelligenceStatus = async (
     meetingId: string,
 ) => {
-    return prisma.meetingIntelligence.create({
-        data: {
+    return prisma.meetingIntelligence.upsert({
+        where: { meetingId },
+        create: {
             meetingId,
             status: 'PENDING',
+        },
+        update: {
+            status: 'PENDING',
+            error: null,
         },
     });
 };

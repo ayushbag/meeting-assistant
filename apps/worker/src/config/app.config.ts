@@ -18,6 +18,11 @@ const envSchema = z.object({
     S3_SECRET_KEY: z.string(),
     S3_BUCKET_NAME: z.string(),
     S3_FORCE_PATH_STYLE: z.string().default('true'),
+
+    QDRANT_URL: z.url(),
+    QDRANT_COLLECTION: z.string(),    
+
+    GEMINI_EMBEDDING_MODEL: z.string(),
 });
 
 export const env = envSchema.parse(process.env);

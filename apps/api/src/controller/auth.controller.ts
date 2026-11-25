@@ -10,7 +10,7 @@ import {
     refreshTokenService,
 } from '../service/auth.service.js';
 import { setAuthCookies, clearAuthCookies } from '../utils/jwt.js';
-import { BadRequestException } from '../utils/app-error.js';
+import { BadRequestException, UnauthorizedException } from '../utils/app-error.js';
 import { ErrorCodeEnum } from '../enums/error-code.enum.js';
 import { env } from '../config/app.config.js';
 
@@ -138,6 +138,10 @@ export const googleCallbackController = asyncHandler(async (req: Request, res: R
  */
 export const refreshTokenController = asyncHandler(async (req: Request, res: Response) => {
     const refreshToken = req.cookies.refreshToken;
+
+    if (!refreshToken) {
+        throw new UnauthorizedException('Refresh token is required');
+    }
 
     const payload = await refreshTokenService(refreshToken);
 

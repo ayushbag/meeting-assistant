@@ -9,7 +9,7 @@ import { logger } from "@repo/logger";
 import { MAX_PART_NUMBER } from "../constants.js";
 import { isNotFoundError } from "../helpers/errors.js";
 import { buildFileKey } from "../helpers/file-key.js";
-import { assertValidMimeType } from "../helpers/validation.js";
+import { assertValidFileExtension, assertValidMimeType } from "../helpers/validation.js";
 import type {
     AbortMultipartUploadInput,
     AbortMultipartUploadResult,
@@ -35,8 +35,9 @@ export const createMultipartUpload = async ({
     fileName,
     mimeType,
 }: CreateMultipartUploadInput): Promise<CreateMultipartUploadResult> => {
-    // 1. Validate MIME type (audio/video only)
+    // 1. Validate MIME type and extension (audio/video only)
     assertValidMimeType(mimeType);
+    assertValidFileExtension(fileName);
 
     // 2. Build a collision-safe object key
     const fileKey = buildFileKey(meetingId, fileName);

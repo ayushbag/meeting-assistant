@@ -7,13 +7,16 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js"
+    "start": "node --import tsx src/index.ts",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint ."
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
     "@repo/db": "workspace:*",
+    "@repo/eslint-config": "workspace:*",
     "@repo/redis": "workspace:*",
     "@repo/typescript-config": "workspace:*",
     "@repo/storage": "workspace:*",
@@ -21,6 +24,7 @@
     "@types/cookie-parser": "^1.4.10",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
+    "eslint": "^9.39.1",
     "tsc-watch": "^7.2.1",
     "tsx": "^4.23.1"
   },

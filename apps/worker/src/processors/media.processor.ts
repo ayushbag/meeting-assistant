@@ -16,7 +16,7 @@ import {
 } from '../services/audio.service.js';
 
 /**
- * Phase 1 media-extraction job (low concurrency — this is the CPU-bound step):
+ * Media-extraction job (low concurrency — this is the CPU-bound step):
  *
  *   download source → ffprobe → ffmpeg (16kHz mono WAV, thread-capped, with a
  *   stream-copy short-circuit) → upload WAV → persist audio metadata →
