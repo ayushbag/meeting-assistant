@@ -1,4 +1,4 @@
-import { chunkTranscript } from './chunker.js';
+import { chunkTranscript } from '@repo/rag';
 
 const transcript = `
 Speaker 1: Good morning everyone. Today I want to finalize the launch plan.

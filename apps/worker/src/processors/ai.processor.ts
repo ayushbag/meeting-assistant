@@ -19,6 +19,7 @@ import {
     transcribeAudio,
 } from '../services/transcription.service.js';
 import { runIntelligencePipeline } from '../services/intelligence/pipeline.js';
+import { indexMeetingForRag } from '../services/rag/indexing.service.js';
 import { runSummaryPipeline } from '../services/summary/pipeline.js';
 
 /**
@@ -100,6 +101,8 @@ export const processAIJob = async (job: Job<AIProcessingJob>) => {
             runSummaryPipeline(transcript, recording.meetingId),
             runIntelligencePipeline(transcript, recording.meetingId),
         ]);
+
+        await indexMeetingForRag(recording.meetingId);
 
         await markCompleted(recording.id, recording.meetingId);
     } catch (error) {

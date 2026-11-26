@@ -187,6 +187,8 @@ model ChatMessage {
 
   message String @db.Text
 
+  citations Json?
+
   createdAt DateTime @default(now())
 
   @@index([meetingId])

@@ -30,6 +30,7 @@
   },
   "dependencies": {
     "@repo/logger": "workspace:*",
+    "@repo/rag": "workspace:*",
     "@types/cors": "^2.8.19",
     "@types/node": "^22.15.3",
     "bcryptjs": "^3.0.3",

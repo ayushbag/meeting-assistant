@@ -1,14 +1,4 @@
-export interface TranscriptChunk {
-    id: string;
-    meetingId: string;
-    sourceType: 'transcript';
-    content: string;
-    metadata: {
-        chunkIndex: number;
-        startSpeaker?: string;
-        endSpeaker?: string;
-    };
-}
+import type { TranscriptChunk } from './types.js';
 
 interface TranscriptLine {
     speaker: string;

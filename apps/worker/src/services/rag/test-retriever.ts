@@ -1,4 +1,4 @@
-import { retrieveDocuments } from './retriever.js';
+import { retrieveDocuments } from '@repo/rag';
 
 const results = await retrieveDocuments(
     'meeting-test-001',

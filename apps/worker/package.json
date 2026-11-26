@@ -20,6 +20,7 @@
         "@repo/db": "workspace:*",
         "@repo/logger": "workspace:*",
         "@repo/queue": "workspace:*",
+        "@repo/rag": "workspace:*",
         "@repo/redis": "workspace:*",
         "@repo/storage": "workspace:*",
         "bullmq": "^6.0.5",

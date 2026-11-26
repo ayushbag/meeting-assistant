@@ -1,6 +1,5 @@
-import { chunkTranscript } from './chunker.js';
+import { chunkTranscript, indexDocuments } from '@repo/rag';
 import { buildRagDocuments } from './document-builder.js';
-import { indexDocuments } from './indexer.js';
 
 const meetingId = 'meeting-test-001';
 

@@ -1,22 +1,4 @@
-export type RagSourceType =
-    | 'goal'
-    | 'key_topic'
-    | 'important_moment'
-    | 'outcome'
-    | 'action_item'
-    | 'decision'
-    | 'discussion_point'
-    | 'risk'
-    | 'open_question'
-    | 'transcript';
-
-export interface RagDocument {
-    id: string;
-    meetingId: string;
-    sourceType: RagSourceType;
-    content: string;
-    metadata: Record<string, unknown>;
-}
+import type { RagDocument, RagSourceType } from '@repo/rag';
 
 interface Evidence {
     sourceSegment?: number;
@@ -85,6 +67,16 @@ function evidenceMetadata(evidence?: Evidence): Record<string, unknown> {
     };
 }
 
+function sourceMetadata(
+    quote: string,
+    evidence?: Evidence,
+): Record<string, unknown> {
+    return {
+        ...evidenceMetadata(evidence),
+        quote: evidence?.quote ?? quote,
+    };
+}
+
 export function buildRagDocuments(
     meetingId: string,
     payload: MeetingIntelligencePayload,
@@ -103,7 +95,7 @@ export function buildRagDocuments(
             meetingId,
             sourceType: 'goal',
             content: `Meeting goal: ${payload.classification.goal}`,
-            metadata: {},
+            metadata: sourceMetadata(`Meeting goal: ${payload.classification.goal}`),
         });
     }
 
@@ -113,7 +105,7 @@ export function buildRagDocuments(
             meetingId,
             sourceType: 'key_topic',
             content: `Key topic: ${topic}`,
-            metadata: {},
+            metadata: sourceMetadata(`Key topic: ${topic}`),
         });
     });
 
@@ -130,7 +122,10 @@ export function buildRagDocuments(
             ]
                 .filter(Boolean)
                 .join('\n'),
-            metadata: evidenceMetadata(moment.evidence),
+            metadata: sourceMetadata(
+                `Important moment: ${moment.summary}`,
+                moment.evidence,
+            ),
         });
     });
 
@@ -140,7 +135,7 @@ export function buildRagDocuments(
             meetingId,
             sourceType: 'outcome',
             content: `Meeting outcome: ${outcome}`,
-            metadata: {},
+            metadata: sourceMetadata(`Meeting outcome: ${outcome}`),
         });
     });
 
@@ -161,7 +156,7 @@ export function buildRagDocuments(
                 .filter(Boolean)
                 .join('\n'),
             metadata: {
-                ...evidenceMetadata(item.evidence),
+                ...sourceMetadata(`Action item: ${item.task}`, item.evidence),
                 owner: item.owner,
                 deadline: item.deadline,
                 importance: item.importance,
@@ -182,7 +177,10 @@ export function buildRagDocuments(
             ]
                 .filter(Boolean)
                 .join('\n'),
-            metadata: evidenceMetadata(decision.evidence),
+            metadata: sourceMetadata(
+                `Decision: ${decision.decision}`,
+                decision.evidence,
+            ),
         });
     });
 
@@ -200,7 +198,10 @@ export function buildRagDocuments(
             ]
                 .filter(Boolean)
                 .join('\n'),
-            metadata: evidenceMetadata(point.evidence),
+            metadata: sourceMetadata(
+                `Discussion topic: ${point.topic}`,
+                point.evidence,
+            ),
         });
     });
 
@@ -218,7 +219,7 @@ export function buildRagDocuments(
             ]
                 .filter(Boolean)
                 .join('\n'),
-            metadata: evidenceMetadata(risk.evidence),
+            metadata: sourceMetadata(`Risk: ${risk.risk}`, risk.evidence),
         });
     });
 
@@ -228,7 +229,7 @@ export function buildRagDocuments(
             meetingId,
             sourceType: 'open_question',
             content: `Open question: ${question}`,
-            metadata: {},
+            metadata: sourceMetadata(`Open question: ${question}`),
         });
     });
 

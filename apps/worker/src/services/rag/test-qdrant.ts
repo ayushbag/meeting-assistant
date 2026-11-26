@@ -1,4 +1,4 @@
-import { ensureQdrantCollection } from './qdrant.js';
+import { ensureQdrantCollection } from '@repo/rag';
 
 await ensureQdrantCollection();
 

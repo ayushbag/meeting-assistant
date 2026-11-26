@@ -22,6 +22,7 @@ import {
     buildRagDocuments,
     type MeetingIntelligencePayload,
 } from './rag/document-builder.js';
+import { indexMeetingForRag } from './rag/indexing.service.js';
 import { runSummaryPipeline } from './summary/pipeline.js';
 
 export const RETRY_ACTIONS = {
@@ -267,6 +268,18 @@ const regenerateSummary = async (meetingId: string, recordingId: string) => {
     }
 };
 
+const reindexMeeting = async (meetingId: string, recordingId: string) => {
+    try {
+        await indexMeetingForRag(meetingId);
+        await markCompleted(recordingId, meetingId);
+
+        logger.info({ meetingId }, 'RAG index rebuilt from stored artifacts');
+    } catch (error) {
+        await markFailed(recordingId, meetingId, error);
+        throw error;
+    }
+};
+
 /** Apply the earliest-safe retry stage and return what was enqueued or repaired. */
 export const retryMeetingProcessing = async (meetingId: string): Promise<RetryDecision> => {
     const decision = await decideRetry(meetingId);
@@ -295,6 +308,7 @@ export const retryMeetingProcessing = async (meetingId: string): Promise<RetryDe
             return decision;
         }
         case RETRY_ACTIONS.INDEX_REQUIRED: {
+            await reindexMeeting(meetingId, decision.recordingId!);
             return decision;
         }
         case RETRY_ACTIONS.NO_ACTION: {
