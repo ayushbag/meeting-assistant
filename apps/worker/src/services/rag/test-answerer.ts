@@ -5,7 +5,7 @@ import { generateRagAnswer, retrieveDocuments } from '@repo/rag';
 const meetingId = 'cmtflfv77000178tubw77m0in';
 
 const question =
-    'What problems were identified during the meeting, and what actions were agreed upon to address them?';
+    'When and where did they agree to meet, and who will share the cafe location?';
 
 const documents = await retrieveDocuments(meetingId, question);
 const answer = await generateRagAnswer({ question, documents });
