@@ -2,6 +2,7 @@ import {
     AbortMultipartUploadCommand,
     CompleteMultipartUploadCommand,
     CreateMultipartUploadCommand,
+    ListPartsCommand,
     UploadPartCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
@@ -18,6 +19,9 @@ import type {
     CreateMultipartUploadInput,
     CreateMultipartUploadResult,
     GetMultipartUploadPartUrlInput,
+    ListMultipartUploadPart,
+    ListMultipartUploadPartsInput,
+    ListMultipartUploadPartsResult,
 } from "../types.js";
 
 /**
@@ -205,4 +209,66 @@ export const abortMultipartUpload = async ({
         logger.error({ err: error, bucket, key: fileKey, uploadId }, "Failed to abort multipart upload");
         throw new Error("Failed to abort multipart upload");
     }
+};
+
+/**
+ * Lists every part already uploaded for an in-progress multipart upload.
+ * S3 caps a single ListParts response at 1000 entries, so pagination is
+ * handled here to give callers the complete set needed to resume an upload.
+ *
+ * A missing upload (already completed or aborted) returns an empty list so a
+ * client can safely start a fresh upload instead of failing on a stale id.
+ */
+export const listMultipartUploadParts = async ({
+    client,
+    bucket,
+    fileKey,
+    uploadId,
+    maxParts = 1000,
+}: ListMultipartUploadPartsInput): Promise<ListMultipartUploadPartsResult> => {
+    const parts: ListMultipartUploadPart[] = [];
+    let partNumberMarker: string | undefined;
+
+    try {
+        do {
+            const output = await client.send(
+                new ListPartsCommand({
+                    Bucket: bucket,
+                    Key: fileKey,
+                    UploadId: uploadId,
+                    MaxParts: maxParts,
+                    PartNumberMarker: partNumberMarker,
+                }),
+            );
+
+            for (const part of output.Parts ?? []) {
+                if (part.PartNumber === undefined || part.ETag === undefined) {
+                    continue;
+                }
+
+                parts.push({
+                    partNumber: part.PartNumber,
+                    etag: part.ETag,
+                    size: part.Size,
+                    lastModified: part.LastModified,
+                });
+            }
+
+            partNumberMarker = output.IsTruncated
+                ? output.NextPartNumberMarker
+                : undefined;
+        } while (partNumberMarker !== undefined);
+    } catch (error) {
+        if (isNotFoundError(error)) {
+            return { fileKey, uploadId, parts: [] };
+        }
+
+        logger.error(
+            { err: error, bucket, key: fileKey, uploadId },
+            "Failed to list multipart upload parts",
+        );
+        throw new Error("Failed to list multipart upload parts");
+    }
+
+    return { fileKey, uploadId, parts };
 };

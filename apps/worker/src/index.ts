@@ -1,6 +1,10 @@
 import { Worker } from 'bullmq';
 import { logger } from '@repo/logger';
-import { getAIWorker, getMediaExtractionWorker } from './config/worker.config.js';
+import {
+    getAIWorker,
+    getMaintenanceWorker,
+    getMediaExtractionWorker,
+} from './config/worker.config.js';
 
 const registerWorkerEvents = (worker: Worker, label: string) => {
     worker.on('ready', () => {
@@ -32,4 +36,10 @@ registerWorkerEvents(mediaWorker, 'media-extraction');
 const aiWorker = getAIWorker();
 registerWorkerEvents(aiWorker, 'ai-processing');
 
-console.log('🎧 Listening for media-extraction and ai-processing jobs...');
+// Maintenance worker: owner-triggered retries and type rebuilds.
+const maintenanceWorker = getMaintenanceWorker();
+registerWorkerEvents(maintenanceWorker, 'meeting-maintenance');
+
+console.log(
+    '🎧 Listening for media-extraction, ai-processing, and meeting-maintenance jobs...',
+);

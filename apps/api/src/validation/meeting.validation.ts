@@ -1,5 +1,29 @@
 import { z } from 'zod';
+import { MeetingStatus, MeetingType } from '@repo/db';
 import { isValidFileExtension, isValidMimeType } from '@repo/storage';
+
+export const meetingIdParamSchema = z.object({
+    meetingId: z.string().trim().min(1, 'Meeting ID is required'),
+});
+
+export const listMeetingsQuerySchema = z.object({
+    page: z.coerce.number().int().positive().default(1),
+    limit: z.coerce.number().int().positive().max(100).default(20),
+    status: z.nativeEnum(MeetingStatus).optional(),
+    type: z.nativeEnum(MeetingType).optional(),
+    sort: z
+        .enum(['createdAt', 'updatedAt', 'title', 'status', 'type'])
+        .default('createdAt'),
+    order: z.enum(['asc', 'desc']).default('desc'),
+});
+
+export const sendChatMessageSchema = z.object({
+    message: z
+        .string()
+        .trim()
+        .min(1, 'Message is required')
+        .max(4000, 'Message cannot exceed 4000 characters'),
+});
 
 export const createMeetingSchema = z.object({
     title: z
@@ -34,6 +58,10 @@ export const updateMeetingSchema = z
         message: 'At least one field must be provided for update.',
     });
 
+export const updateMeetingTypeSchema = z.object({
+    type: z.nativeEnum(MeetingType),
+});
+
 export const initiateMultipartUploadSchema = z.object({
     fileName: z
         .string()
@@ -58,6 +86,14 @@ export const multipartUploadPartSchema = z.object({
     fileKey: z.string().trim().min(1),
     partNumber: z.number().int().positive(),
 });
+
+export const multipartUploadIdentitySchema = z.object({
+    uploadId: z.string().trim().min(1, 'Upload ID is required'),
+    fileKey: z.string().trim().min(1, 'File key is required'),
+});
+
+export const abortMultipartUploadSchema = multipartUploadIdentitySchema;
+export const listMultipartUploadPartsSchema = multipartUploadIdentitySchema;
 
 export const completeMultipartUploadSchema = z.object({
     uploadId: z.string().trim().min(1),

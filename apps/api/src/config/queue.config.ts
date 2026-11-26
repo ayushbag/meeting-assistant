@@ -1,7 +1,8 @@
-import { createMediaExtractionQueue } from '@repo/queue';
+import { createMaintenanceQueue, createMediaExtractionQueue } from '@repo/queue';
 import { getRedisConnection } from './redis.config.js';
 
 let mediaExtractionQueue: ReturnType<typeof createMediaExtractionQueue> | undefined;
+let maintenanceQueue: ReturnType<typeof createMaintenanceQueue> | undefined;
 
 /**
  * Returns the singleton media-extraction queue, creating it lazily on first use.
@@ -29,4 +30,23 @@ export const getMediaExtractionQueue = (): ReturnType<typeof createMediaExtracti
         });
     }
     return mediaExtractionQueue;
+};
+
+/**
+ * Owner-triggered maintenance jobs: stage-aware retries and type rebuilds.
+ * Runs on its own queue so a long rebuild cannot block uploads or AI work.
+ */
+export const getMaintenanceQueue = (): ReturnType<typeof createMaintenanceQueue> => {
+    if (!maintenanceQueue) {
+        maintenanceQueue = createMaintenanceQueue({
+            connection: getRedisConnection(),
+            defaultJobOptions: {
+                attempts: 3,
+                backoff: { type: 'exponential', delay: 5000 },
+                removeOnComplete: { count: 1000 },
+                removeOnFail: { count: 5000 },
+            },
+        });
+    }
+    return maintenanceQueue;
 };

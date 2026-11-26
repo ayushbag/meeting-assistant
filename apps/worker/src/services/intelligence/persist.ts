@@ -4,7 +4,7 @@
  * and saves it to your database.
  */
 
-import { prisma } from "@repo/db";
+import { prisma, type MeetingType } from "@repo/db";
 import { MeetingClassification } from "./classifier.js";
 import { CommonIntelligence } from "./schemas/common.js";
 
@@ -16,12 +16,15 @@ type PersistIntelligenceInput = {
     segmentCount: number;
     promptVersion?: string;
     model?: string;
+    forcedMeetingType?: MeetingType;
 };
 
 export const persistIntelligence = async (
     input: PersistIntelligenceInput,
 ) => {
-    const meetingType = input.resolvedMeetingType.toUpperCase() as 'BUSINESS' | 'OTHER';
+    const meetingType =
+        input.forcedMeetingType ??
+        (input.resolvedMeetingType.toUpperCase() as 'BUSINESS' | 'OTHER');
 
     return prisma.$transaction([
         prisma.meeting.update({

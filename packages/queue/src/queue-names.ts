@@ -13,4 +13,9 @@ export const QUEUE_NAMES = {
      * on API calls).
      */
     AI_PROCESSING: 'ai-processing',
+
+    /**
+     * Owner-triggered maintenance: stage-aware retries and meeting-type rebuilds.
+     */
+    MEETING_MAINTENANCE: 'meeting-maintenance',
 } as const;

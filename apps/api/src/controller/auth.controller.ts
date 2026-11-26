@@ -8,6 +8,7 @@ import {
     googleCallbackService,
     googleLoginService,
     refreshTokenService,
+    logoutUserService,
 } from '../service/auth.service.js';
 import { setAuthCookies, clearAuthCookies } from '../utils/jwt.js';
 import { BadRequestException, UnauthorizedException } from '../utils/app-error.js';
@@ -21,16 +22,14 @@ import { env } from '../config/app.config.js';
 export const registerUserController = asyncHandler(async (req: Request, res: Response) => {
     const body = registerSchema.parse(req.body);
 
-    const { user, accessToken, refreshToken } = await registerUserService(body);
+    const { user, refreshToken } = await registerUserService(body);
 
-    // Set httpOnly cookies
-    setAuthCookies(res, { userId: user.id, email: user.email });
+    // Tokens are cookie-only: never expose them to script-readable JSON.
+    setAuthCookies(res, { userId: user.id, email: user.email }, refreshToken);
 
     return res.status(HTTPSTATUS.CREATED).json({
         message: 'User created successfully',
         user,
-        accessToken,
-        refreshToken,
     });
 });
 
@@ -41,16 +40,14 @@ export const registerUserController = asyncHandler(async (req: Request, res: Res
 export const loginUserController = asyncHandler(async (req: Request, res: Response) => {
     const body = loginSchema.parse(req.body);
 
-    const { user, accessToken, refreshToken } = await loginUserService(body);
+    const { user, refreshToken } = await loginUserService(body);
 
-    // Set httpOnly cookies
-    setAuthCookies(res, { userId: user.id, email: user.email });
+    // Tokens are cookie-only: never expose them to script-readable JSON.
+    setAuthCookies(res, { userId: user.id, email: user.email }, refreshToken);
 
     return res.status(HTTPSTATUS.OK).json({
         message: 'Login successful',
         user,
-        accessToken,
-        refreshToken,
     });
 });
 
@@ -58,7 +55,8 @@ export const loginUserController = asyncHandler(async (req: Request, res: Respon
  * POST /auth/logout
  * Clear auth cookies to log out the user.
  */
-export const logoutUserController = asyncHandler(async (_req: Request, res: Response) => {
+export const logoutUserController = asyncHandler(async (req: Request, res: Response) => {
+    await logoutUserService(req.cookies?.refreshToken);
     clearAuthCookies(res);
 
     return res.status(HTTPSTATUS.OK).json({
@@ -125,9 +123,9 @@ export const googleCallbackController = asyncHandler(async (req: Request, res: R
     // Clear the state cookie after successful verification
     res.clearCookie('googleOAuthState', { path: '/' });
 
-    const { user } = await googleCallbackService(code);
+    const { user, refreshToken } = await googleCallbackService(code);
 
-    setAuthCookies(res, { userId: user.id, email: user.email });
+    setAuthCookies(res, { userId: user.id, email: user.email }, refreshToken);
 
     return res.redirect(`${env.FRONTEND_ORIGIN}/dashboard`);
 });
@@ -143,9 +141,11 @@ export const refreshTokenController = asyncHandler(async (req: Request, res: Res
         throw new UnauthorizedException('Refresh token is required');
     }
 
-    const payload = await refreshTokenService(refreshToken);
+    const { refreshToken: rotatedRefreshToken, ...payload } = await refreshTokenService(
+        refreshToken,
+    );
 
-    setAuthCookies(res, payload);
+    setAuthCookies(res, payload, rotatedRefreshToken);
 
     return res.status(200).json({
         message: "Access token refreshed successfully"

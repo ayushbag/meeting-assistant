@@ -65,6 +65,27 @@ export type AbortMultipartUploadResult = {
     aborted: boolean;
 };
 
+export type ListMultipartUploadPartsInput = {
+    client: StorageClient;
+    bucket: string;
+    fileKey: string;
+    uploadId: string;
+    maxParts?: number;
+};
+
+export type ListMultipartUploadPart = {
+    partNumber: number;
+    etag: string;
+    size?: number;
+    lastModified?: Date;
+};
+
+export type ListMultipartUploadPartsResult = {
+    fileKey: string;
+    uploadId: string;
+    parts: ListMultipartUploadPart[];
+};
+
 export type DownloadRecordingInput = {
     client: StorageClient;
     bucket: string;

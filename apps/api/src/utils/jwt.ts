@@ -1,3 +1,4 @@
+import { createHash, randomUUID } from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import { env } from '../config/app.config.js';
 import { logger } from '@repo/logger';
@@ -10,6 +11,12 @@ export type JwtPayload = {
 
 const ACCESS_TOKEN_EXPIRES_IN = '15m';
 const REFRESH_TOKEN_EXPIRES_IN = '7d';
+
+export const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** Hash a raw refresh token before persisting or looking it up. */
+export const hashRefreshToken = (token: string): string =>
+    createHash('sha256').update(token).digest('hex');
 
 const accessTokenCookieOptions: CookieOptions = {
     httpOnly: true,
@@ -40,7 +47,8 @@ export const signAccessToken = (payload: JwtPayload): string => {
  * Sign a refresh token (long-lived, 7 days).
  */
 export const signRefreshToken = (payload: JwtPayload): string => {
-    return jwt.sign(payload, env.JWT_REFRESH_SECRET, {
+    // jti guarantees distinct tokens even for two logins in the same second.
+    return jwt.sign({ ...payload, jti: randomUUID() }, env.JWT_REFRESH_SECRET, {
         expiresIn: REFRESH_TOKEN_EXPIRES_IN,
     });
 };
@@ -63,9 +71,12 @@ export const verifyRefreshToken = (token: string): JwtPayload => {
 /**
  * Set both tokens as httpOnly cookies on the response.
  */
-export const setAuthCookies = (res: Response, payload: JwtPayload) => {
+export const setAuthCookies = (
+    res: Response,
+    payload: JwtPayload,
+    refreshToken: string,
+) => {
     const accessToken = signAccessToken(payload);
-    const refreshToken = signRefreshToken(payload);
 
     res.cookie('accessToken', accessToken, accessTokenCookieOptions);
     res.cookie('refreshToken', refreshToken, refreshTokenCookieOptions);

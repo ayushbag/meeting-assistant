@@ -6,6 +6,7 @@ import { env } from './config/app.config.js';
 import authRoutes from './routes/auth.routes.js';
 import { meetingRoutes } from './routes/meeting.routes.js';
 import { authenticate } from './middlewares/auth.middleware.js';
+import { ErrorCodeEnum } from './enums/error-code.enum.js';
 
 export const app: Express = express();
 const BASE_PATH = env.BASE_PATH;
@@ -42,6 +43,14 @@ app.get('/health', (_req, res) => {
 // API routes
 app.use(`${BASE_PATH}/auth`, authRoutes);
 app.use(`${BASE_PATH}/meetings`, authenticate, meetingRoutes);
+
+// unknown routes use the same JSON envelope as application errors
+app.use((_req, res) => {
+    res.status(404).json({
+        message: 'Resource not found',
+        errorCode: ErrorCodeEnum.RESOURCE_NOT_FOUND,
+    });
+});
 
 // centralised error handling
 app.use(errorHandler);

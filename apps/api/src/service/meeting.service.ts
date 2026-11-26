@@ -1,24 +1,37 @@
+import { randomUUID } from 'node:crypto';
 import type { z } from 'zod';
 import {
+    abortMultipartUploadSchema,
     completeMultipartUploadSchema,
     createMeetingSchema,
     initiateMultipartUploadSchema,
+    listMeetingsQuerySchema,
+    listMultipartUploadPartsSchema,
     multipartUploadPartSchema,
     updateMeetingSchema,
+    updateMeetingTypeSchema,
 } from '../validation/meeting.validation.js';
-import { prisma, RecordingStatus } from '@repo/db';
+import { MeetingType, Prisma, prisma, RecordingStatus } from '@repo/db';
+import { logger } from '@repo/logger';
+import { deleteMeetingDocuments } from '@repo/rag';
 import { BadRequestException, InternalServerError, NotFoundException } from '../utils/app-error.js';
 import {
+    abortMultipartUpload,
     completeMultipartUpload,
     createMultipartUpload,
+    deleteObjectsForMeeting,
     getMultipartUploadPartUrl,
     headRecording,
+    listMultipartUploadParts,
     isValidFileExtension,
     isValidMimeType,
 } from '@repo/storage';
 import { getStorageClient } from '../config/storage.config.js';
 import { env } from '../config/app.config.js';
-import { getMediaExtractionQueue } from '../config/queue.config.js';
+import {
+    getMaintenanceQueue,
+    getMediaExtractionQueue,
+} from '../config/queue.config.js';
 import { JOB_NAMES } from '@repo/queue';
 
 /**
@@ -39,6 +52,7 @@ const findOwnedRecordingForUpload = async (
             id: true,
             meetingId: true,
             fileKey: true,
+            status: true,
         },
     });
 
@@ -75,14 +89,57 @@ export const createMeetingService = async (
     return meeting;
 };
 
-export const getMeetingsService = async (userId: string) => {
-    const meetings = await prisma.meeting.findMany({
-        where: {
-            createdById: userId,
-        },
-    });
+export const getMeetingsService = async (
+    query: z.infer<typeof listMeetingsQuerySchema>,
+    userId: string,
+) => {
+    const where: Prisma.MeetingWhereInput = {
+        createdById: userId,
+        ...(query.status !== undefined && { status: query.status }),
+        ...(query.type !== undefined && { type: query.type }),
+    };
 
-    return meetings;
+    const primaryOrder: Prisma.MeetingOrderByWithRelationInput = (() => {
+        switch (query.sort) {
+            case 'title':
+                return { title: query.order };
+            case 'status':
+                return { status: query.order };
+            case 'type':
+                return { type: query.order };
+            case 'updatedAt':
+                return { updatedAt: query.order };
+            case 'createdAt':
+            default:
+                return { createdAt: query.order };
+        }
+    })();
+
+    const [items, total] = await prisma.$transaction([
+        prisma.meeting.findMany({
+            where,
+            skip: (query.page - 1) * query.limit,
+            take: query.limit,
+            orderBy: [primaryOrder, { id: 'asc' }],
+            select: {
+                id: true,
+                title: true,
+                description: true,
+                status: true,
+                type: true,
+                createdAt: true,
+                updatedAt: true,
+            },
+        }),
+        prisma.meeting.count({ where }),
+    ]);
+
+    return {
+        items,
+        total,
+        page: query.page,
+        limit: query.limit,
+    };
 };
 
 export const getMeetingService = async (meetingId: string, userId: string) => {
@@ -147,6 +204,32 @@ export const deleteMeetingService = async (meetingId: string, userId: string) =>
         throw new NotFoundException('Meeting not found');
     }
 
+    const cleanup = {
+        storage: { ok: false, deleted: 0 },
+        qdrant: { ok: false },
+    };
+
+    // Cleanup is best-effort: a storage or vector-store outage must not strand
+    // the meeting row, so failures are logged and reported in the response.
+    try {
+        const result = await deleteObjectsForMeeting({
+            client: getStorageClient(),
+            bucket: env.S3_BUCKET_NAME ?? 'meetings',
+            meetingId,
+        });
+
+        cleanup.storage = { ok: true, deleted: result.deleted };
+    } catch (error) {
+        logger.error({ err: error, meetingId }, 'Failed to delete meeting storage objects');
+    }
+
+    try {
+        await deleteMeetingDocuments(meetingId);
+        cleanup.qdrant = { ok: true };
+    } catch (error) {
+        logger.error({ err: error, meetingId }, 'Failed to delete meeting vectors');
+    }
+
     try {
         const meeting = await prisma.meeting.delete({
             where: {
@@ -158,7 +241,10 @@ export const deleteMeetingService = async (meetingId: string, userId: string) =>
             },
         });
 
-        return meeting;
+        return {
+            ...meeting,
+            cleanup,
+        };
     } catch (error) {
         // Prisma P2025: Record not found (e.g. deleted between check and delete)
         if (
@@ -231,7 +317,7 @@ export const initiateMultipartUploadService = async (
 
     return {
         uploadId: upload.uploadId,
-        filekey: upload.fileKey,
+        fileKey: upload.fileKey,
     };
 };
 
@@ -255,6 +341,59 @@ export const getMultipartUploadPartUrlService = async (
     });
 
     return url;
+};
+
+export const abortMultipartUploadService = async (
+    body: z.infer<typeof abortMultipartUploadSchema>,
+    meetingId: string,
+    userId: string,
+) => {
+    const ownedRecording = await findOwnedRecordingForUpload(
+        body.fileKey,
+        meetingId,
+        userId,
+    );
+
+    const result = await abortMultipartUpload({
+        client: getStorageClient(),
+        bucket: env.S3_BUCKET_NAME ?? 'meetings',
+        fileKey: ownedRecording.fileKey,
+        uploadId: body.uploadId,
+    });
+
+    // Only an in-progress upload becomes FAILED. Completed uploads are left
+    // untouched because abort is idempotent and may target a stale upload id.
+    await prisma.recording.updateMany({
+        where: {
+            id: ownedRecording.id,
+            status: RecordingStatus.UPLOADING,
+        },
+        data: {
+            status: RecordingStatus.FAILED,
+            error: 'Upload aborted by meeting owner',
+        },
+    });
+
+    return result;
+};
+
+export const listMultipartUploadPartsService = async (
+    query: z.infer<typeof listMultipartUploadPartsSchema>,
+    meetingId: string,
+    userId: string,
+) => {
+    const ownedRecording = await findOwnedRecordingForUpload(
+        query.fileKey,
+        meetingId,
+        userId,
+    );
+
+    return listMultipartUploadParts({
+        client: getStorageClient(),
+        bucket: env.S3_BUCKET_NAME ?? 'meetings',
+        fileKey: ownedRecording.fileKey,
+        uploadId: query.uploadId,
+    });
 };
 
 export const completeMultipartUploadService = async (
@@ -385,4 +524,56 @@ export const getMeetingStatusService = async (meetingId: string, userId: string)
         recordingError: meeting.recording?.error ?? null,
         intelligenceError: meeting.intelligence?.error ?? null,
     }
+};
+
+export const retryMeetingService = async (
+    meetingId: string,
+    userId: string,
+) => {
+    await getMeetingService(meetingId, userId);
+
+    const attemptId = randomUUID();
+    const job = await getMaintenanceQueue().add(
+        JOB_NAMES.RETRY_PROCESSING,
+        { meetingId, attemptId },
+        { jobId: `${meetingId}-retry-${attemptId}` },
+    );
+
+    return {
+        meetingId,
+        jobId: job.id,
+        status: 'queued' as const,
+    };
+};
+
+export const updateMeetingTypeService = async (
+    body: z.infer<typeof updateMeetingTypeSchema>,
+    meetingId: string,
+    userId: string,
+) => {
+    await getMeetingService(meetingId, userId);
+
+    const meeting = await prisma.meeting.update({
+        where: { id: meetingId },
+        data: { type: body.type as MeetingType },
+        select: {
+            id: true,
+            title: true,
+            type: true,
+            status: true,
+        },
+    });
+
+    const attemptId = randomUUID();
+    const job = await getMaintenanceQueue().add(
+        JOB_NAMES.REBUILD_MEETING_TYPE,
+        { meetingId, meetingType: body.type, attemptId },
+        { jobId: `${meetingId}-type-${attemptId}` },
+    );
+
+    return {
+        meeting,
+        jobId: job.id,
+        status: 'queued' as const,
+    };
 };

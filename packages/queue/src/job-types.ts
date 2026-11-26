@@ -13,3 +13,28 @@ export interface AIProcessingJob {
     /** Resume point. Omitted means start at transcription. */
     fromStage?: AIStage;
 }
+
+export type MeetingTypeValue =
+    | 'LECTURE'
+    | 'BUSINESS'
+    | 'SALES'
+    | 'INTERVIEW'
+    | 'STANDUP'
+    | 'BRAINSTORM'
+    | 'REVIEW'
+    | 'OTHER';
+
+export interface RetryProcessingJob {
+    meetingId: string;
+    /** Unique per enqueue so a retained failed job never blocks a retry. */
+    attemptId?: string;
+}
+
+export interface RebuildMeetingTypeJob {
+    meetingId: string;
+    meetingType: MeetingTypeValue;
+    /** Unique per enqueue so a retained failed job never blocks a retry. */
+    attemptId?: string;
+}
+
+export type MaintenanceJob = RetryProcessingJob | RebuildMeetingTypeJob;

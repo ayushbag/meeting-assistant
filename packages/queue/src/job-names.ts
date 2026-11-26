@@ -4,6 +4,12 @@ export const JOB_NAMES = {
 
     /** Download WAV → Gemini transcription → persist transcript → intelligence. */
     PROCESS_AI: 'process-ai',
+
+    /** Resume processing from the earliest missing artifact. */
+    RETRY_PROCESSING: 'retry-processing',
+
+    /** Regenerate intelligence, summary, and RAG index after a type override. */
+    REBUILD_MEETING_TYPE: 'rebuild-meeting-type',
 } as const;
 
 /** Stages an AI job can resume from without losing already-persisted work. */

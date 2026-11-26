@@ -1,12 +1,20 @@
 import { Worker } from 'bullmq';
-import { JOB_NAMES, QUEUE_NAMES, type AIProcessingJob, type MediaExtractionJob } from '@repo/queue';
+import {
+    JOB_NAMES,
+    QUEUE_NAMES,
+    type AIProcessingJob,
+    type MaintenanceJob,
+    type MediaExtractionJob,
+} from '@repo/queue';
 
 import { getRedisConnection } from './redis.config.js';
 import { processMediaExtractionJob } from '../processors/media.processor.js';
 import { processAIJob } from '../processors/ai.processor.js';
+import { processMaintenanceJob } from '../processors/maintenance.processor.js';
 
 let mediaExtractionWorker: Worker<MediaExtractionJob> | undefined;
 let aiWorker: Worker<AIProcessingJob> | undefined;
+let maintenanceWorker: Worker<MaintenanceJob> | undefined;
 
 /**
  * Returns the singleton BullMQ worker for the media-extraction queue.
@@ -67,4 +75,25 @@ export const getAIWorker = (): Worker<AIProcessingJob> => {
     }
 
     return aiWorker;
+};
+
+/**
+ * Owner-triggered maintenance jobs: stage-aware retries and type rebuilds.
+ * Low concurrency because each job can run model calls and reindexing.
+ */
+export const getMaintenanceWorker = (): Worker<MaintenanceJob> => {
+    if (!maintenanceWorker) {
+        maintenanceWorker = new Worker<MaintenanceJob>(
+            QUEUE_NAMES.MEETING_MAINTENANCE,
+            async (job) => {
+                await processMaintenanceJob(job);
+            },
+            {
+                connection: getRedisConnection(),
+                concurrency: 1,
+            },
+        );
+    }
+
+    return maintenanceWorker;
 };

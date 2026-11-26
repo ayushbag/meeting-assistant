@@ -9,6 +9,10 @@ import {
 import { BadRequestException, NotFoundException } from '../utils/app-error.js';
 
 const HISTORY_TURN_LIMIT = 8;
+const HISTORY_TOKEN_BUDGET = 2000;
+const CHARS_PER_TOKEN = 4;
+
+const estimateTokens = (text: string) => Math.ceil(text.length / CHARS_PER_TOKEN);
 
 const findOwnedMeeting = async (meetingId: string, userId: string) => {
     const meeting = await prisma.meeting.findFirst({
@@ -36,7 +40,21 @@ const loadRecentTurns = async (
         select: { role: true, message: true },
     });
 
-    return messages.reverse().map((message) => ({
+    const selected: typeof messages = [];
+    let usedTokens = 0;
+
+    for (const message of messages) {
+        const tokens = estimateTokens(message.message);
+
+        if (selected.length > 0 && usedTokens + tokens > HISTORY_TOKEN_BUDGET) {
+            break;
+        }
+
+        selected.push(message);
+        usedTokens += tokens;
+    }
+
+    return selected.reverse().map((message) => ({
         role:
             message.role === ChatRole.USER
                 ? ('user' as const)

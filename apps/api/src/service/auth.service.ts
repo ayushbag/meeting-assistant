@@ -5,18 +5,48 @@ import { hashValue, comparePassword } from '../utils/bcrpyt.js';
 import { prisma } from '@repo/db';
 import {
     BadRequestException,
-    InternalServerError,
     UnauthorizedException,
 } from '../utils/app-error.js';
 import { ErrorCodeEnum } from '../enums/error-code.enum.js';
 import {
-    setAuthCookies,
+    hashRefreshToken,
+    REFRESH_TOKEN_TTL_MS,
     signAccessToken,
     signRefreshToken,
     verifyRefreshToken,
+    type JwtPayload,
 } from '../utils/jwt.js';
 import { googleClient } from '../utils/google.js';
 import { env } from '../config/app.config.js';
+
+type AuthPayload = {
+    userId: string;
+    email: string;
+};
+
+type IssuedTokens = {
+    accessToken: string;
+    refreshToken: string;
+};
+
+/**
+ * Issues a fresh access/refresh pair and stores only the refresh token hash
+ * server-side. The raw refresh token lives in the httpOnly cookie only.
+ */
+const issueAuthSession = async (payload: AuthPayload): Promise<IssuedTokens> => {
+    const accessToken = signAccessToken(payload);
+    const refreshToken = signRefreshToken(payload);
+
+    await prisma.refreshSession.create({
+        data: {
+            userId: payload.userId,
+            tokenHash: hashRefreshToken(refreshToken),
+            expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS),
+        },
+    });
+
+    return { accessToken, refreshToken };
+};
 
 /**
  * Register a new user.
@@ -57,15 +87,12 @@ export const registerUserService = async (body: z.infer<typeof registerSchema>) 
         },
     });
 
-    // 4. Sign tokens
-    const payload = { userId: user.id, email: user.email };
-    const accessToken = signAccessToken(payload);
-    const refreshToken = signRefreshToken(payload);
+    // 4. Issue tokens and persist the refresh session
+    const tokens = await issueAuthSession({ userId: user.id, email: user.email });
 
     return {
         user,
-        accessToken,
-        refreshToken,
+        ...tokens,
     };
 };
 
@@ -104,10 +131,8 @@ export const loginUserService = async (body: z.infer<typeof loginSchema>) => {
         );
     }
 
-    // 3. Sign tokens
-    const payload = { userId: user.id, email: user.email };
-    const accessToken = signAccessToken(payload);
-    const refreshToken = signRefreshToken(payload);
+    // 3. Issue tokens and persist the refresh session
+    const tokens = await issueAuthSession({ userId: user.id, email: user.email });
 
     return {
         user: {
@@ -116,8 +141,7 @@ export const loginUserService = async (body: z.infer<typeof loginSchema>) => {
             email: user.email,
             createdAt: user.createdAt,
         },
-        accessToken,
-        refreshToken,
+        ...tokens,
     };
 };
 
@@ -211,9 +235,9 @@ export const findOrCreateExistingUser = async (googleUser: GoogleUserData) => {
  */
 export const googleCallbackService = async (code: string) => {
     // Exchange authorization code for tokens
-    const { tokens } = await googleClient.getToken(code);
+    const { tokens: googleTokens } = await googleClient.getToken(code);
 
-    if (!tokens.id_token) {
+    if (!googleTokens.id_token) {
         throw new BadRequestException(
             'Google did not return an ID token',
             ErrorCodeEnum.AUTH_INVALID_TOKEN,
@@ -222,7 +246,7 @@ export const googleCallbackService = async (code: string) => {
 
     // Verify Google ID token
     const ticket = await googleClient.verifyIdToken({
-        idToken: tokens.id_token,
+        idToken: googleTokens.id_token,
         audience: env.GOOGLE_CLIENT_ID,
     });
 
@@ -250,29 +274,108 @@ export const googleCallbackService = async (code: string) => {
         avatar: payload.picture ?? '',
     });
 
+    const authTokens = await issueAuthSession({
+        userId: user.id,
+        email: user.email,
+    });
+
     return {
         user,
+        ...authTokens,
     };
 };
 
+const revokeAllUserSessions = async (userId: string) => {
+    await prisma.refreshSession.updateMany({
+        where: {
+            userId,
+            revokedAt: null,
+        },
+        data: {
+            revokedAt: new Date(),
+        },
+    });
+};
+
 /**
- * Verify the refresh token and return the authenticated user payload.
+ * Rotate a refresh token. Reuse of an already-rotated token revokes every
+ * session for that user, which limits the blast radius of a stolen token.
  */
 export const refreshTokenService = async (token: string) => {
-    const payload = verifyRefreshToken(token);
+    let payload: JwtPayload;
+    try {
+        payload = verifyRefreshToken(token);
+    } catch {
+        throw new UnauthorizedException('Invalid refresh token', ErrorCodeEnum.AUTH_INVALID_TOKEN);
+    }
 
     const user = await prisma.user.findUnique({
         where: {
             id: payload.userId,
         },
+        select: {
+            id: true,
+            email: true,
+        },
     });
 
-    if (!user) {
-        throw new UnauthorizedException();
+    if (!user || user.email !== payload.email) {
+        throw new UnauthorizedException('Invalid refresh token', ErrorCodeEnum.AUTH_INVALID_TOKEN);
     }
+
+    const tokenHash = hashRefreshToken(token);
+    const session = await prisma.refreshSession.findUnique({
+        where: { tokenHash },
+    });
+
+    if (!session || session.userId !== user.id) {
+        throw new UnauthorizedException('Invalid refresh token', ErrorCodeEnum.AUTH_INVALID_TOKEN);
+    }
+
+    if (session.revokedAt || session.expiresAt <= new Date()) {
+        await revokeAllUserSessions(user.id);
+        throw new UnauthorizedException('Invalid refresh token', ErrorCodeEnum.AUTH_INVALID_TOKEN);
+    }
+
+    const rotated = await prisma.refreshSession.updateMany({
+        where: {
+            id: session.id,
+            revokedAt: null,
+        },
+        data: {
+            revokedAt: new Date(),
+        },
+    });
+
+    if (rotated.count !== 1) {
+        // Another request already rotated this token: treat it as reuse.
+        await revokeAllUserSessions(user.id);
+        throw new UnauthorizedException('Invalid refresh token', ErrorCodeEnum.AUTH_INVALID_TOKEN);
+    }
+
+    const tokens = await issueAuthSession({ userId: user.id, email: user.email });
 
     return {
         userId: user.id,
-        email: user.email
-    }
+        email: user.email,
+        ...tokens,
+    };
+};
+
+/**
+ * Revoke the refresh session backing the current logout request.
+ * Logout stays idempotent: missing or malformed cookies are ignored.
+ */
+export const logoutUserService = async (token?: string) => {
+    if (!token) return;
+
+    await prisma.refreshSession.updateMany({
+        where: {
+            tokenHash: hashRefreshToken(token),
+            revokedAt: null,
+        },
+        data: {
+            revokedAt: new Date(),
+        },
+    });
 };
